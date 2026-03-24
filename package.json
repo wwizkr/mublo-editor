@@ -1,0 +1,45 @@
+{
+  "name": "mublo-editor",
+  "version": "1.3.0",
+  "description": "Lightweight WYSIWYG editor with zero dependencies. Built-in i18n, image upload, autosave, and plugin system.",
+  "main": "dist/mublo-editor.umd.js",
+  "module": "dist/mublo-editor.esm.js",
+  "browser": "dist/mublo-editor.min.js",
+  "types": "types/MubloEditor.d.ts",
+  "style": "dist/mublo-editor.min.css",
+  "files": [
+    "src/",
+    "dist/",
+    "types/",
+    "plugins/",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "esbuild src/MubloEditor.js --bundle --format=esm --outfile=dist/mublo-editor.esm.js && esbuild src/MubloEditor.js --bundle --format=iife --global-name=MubloEditor --outfile=dist/mublo-editor.umd.js && esbuild src/MubloEditor.js --bundle --minify --format=iife --global-name=MubloEditor --outfile=dist/mublo-editor.min.js && cp src/MubloEditor.css dist/mublo-editor.css && esbuild src/MubloEditor.css --minify --outfile=dist/mublo-editor.min.css",
+    "dev": "open demo/index.html"
+  },
+  "keywords": [
+    "wysiwyg",
+    "editor",
+    "rich-text",
+    "contenteditable",
+    "lightweight",
+    "no-dependencies",
+    "i18n",
+    "image-upload",
+    "autosave"
+  ],
+  "author": "Mublo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mublo/mublo-editor"
+  },
+  "homepage": "https://github.com/mublo/mublo-editor#readme",
+  "bugs": {
+    "url": "https://github.com/mublo/mublo-editor/issues"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

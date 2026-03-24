@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MubloEditor Demo</title>
+    <link rel="stylesheet" href="../src/MubloEditor.css">
+    <style>
+        :root { --demo-bg: #f8f9fa; --demo-text: #212529; --demo-card: #fff; --demo-border: #dee2e6; }
+        [data-theme="dark"] { --demo-bg: #1a1a2e; --demo-text: #e0e0e0; --demo-card: #16213e; --demo-border: #334155; --bs-body-bg: #16213e; --bs-body-color: #e0e0e0; --bs-tertiary-bg: #1a1a2e; --bs-secondary-bg: #334155; --bs-border-color: #334155; --bs-secondary-color: #94a3b8; --bs-primary: #6366f1; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--demo-bg); color: var(--demo-text); line-height: 1.6; }
+
+        .demo-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 2rem; text-align: center; }
+        .demo-header h1 { font-size: 2rem; font-weight: 700; margin-bottom: .25rem; }
+        .demo-header p { opacity: .85; font-size: 1.1rem; }
+        .demo-header .badges { margin-top: .75rem; display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+        .demo-header .badge { background: rgba(255,255,255,0.2); padding: .25rem .75rem; border-radius: 999px; font-size: .8rem; }
+
+        .demo-controls { display: flex; gap: 1rem; justify-content: center; padding: 1rem; background: var(--demo-card); border-bottom: 1px solid var(--demo-border); flex-wrap: wrap; }
+        .demo-controls button, .demo-controls select { padding: .5rem 1rem; border: 1px solid var(--demo-border); border-radius: .375rem; background: var(--demo-card); color: var(--demo-text); cursor: pointer; font-size: .875rem; }
+        .demo-controls button:hover { background: var(--demo-border); }
+
+        .demo-container { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+        .demo-section { background: var(--demo-card); border: 1px solid var(--demo-border); border-radius: .5rem; padding: 1.5rem; margin-bottom: 2rem; }
+        .demo-section h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: .5rem; }
+        .demo-section p.desc { color: #6c757d; font-size: .875rem; margin-bottom: 1rem; }
+
+        .demo-output { margin-top: 1rem; }
+        .demo-output summary { cursor: pointer; font-size: .875rem; font-weight: 600; color: #6c757d; }
+        .demo-output pre { margin-top: .5rem; padding: 1rem; background: var(--demo-bg); border: 1px solid var(--demo-border); border-radius: .375rem; font-size: .8rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 200px; }
+
+        footer { text-align: center; padding: 2rem; color: #6c757d; font-size: .875rem; }
+        footer a { color: #667eea; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="demo-header">
+        <h1>MubloEditor</h1>
+        <p>Lightweight WYSIWYG editor with zero dependencies</p>
+        <div class="badges">
+            <span class="badge">~35KB</span>
+            <span class="badge">Zero deps</span>
+            <span class="badge">i18n</span>
+            <span class="badge">Dark mode</span>
+            <span class="badge">Plugins</span>
+        </div>
+    </div>
+
+    <div class="demo-controls">
+        <select id="locale-select">
+            <option value="ko">Korean (한국어)</option>
+            <option value="en" selected>English</option>
+        </select>
+        <button id="theme-toggle">Toggle Dark Mode</button>
+        <button id="readonly-toggle">Toggle Readonly</button>
+        <button id="get-html">Get HTML</button>
+    </div>
+
+    <div class="demo-container">
+        <!-- Full Toolbar -->
+        <div class="demo-section">
+            <h2>Full Toolbar</h2>
+            <p class="desc">All available toolbar items with word count and autosave.</p>
+            <textarea id="editor-full" class="mublo-editor"
+                data-toolbar="full"
+                data-height="350"
+                data-locale="en"
+                data-show-word-count="true"
+                data-max-length="10000"
+                data-placeholder="Start writing something amazing...">
+<p>Welcome to <strong>MubloEditor</strong>! This is a lightweight WYSIWYG editor with zero dependencies.</p>
+<h2>Features</h2>
+<ul>
+<li>Drag &amp; drop images</li>
+<li>Double-click to replace images</li>
+<li>Markdown shortcuts: type <code>#</code> + space for headings</li>
+<li>Find &amp; replace with <code>Ctrl+F</code></li>
+</ul>
+<blockquote>Try the dark mode toggle above!</blockquote>
+            </textarea>
+            <details class="demo-output">
+                <summary>View HTML Output</summary>
+                <pre id="output-full"></pre>
+            </details>
+        </div>
+
+        <!-- Basic Toolbar -->
+        <div class="demo-section">
+            <h2>Basic Toolbar</h2>
+            <p class="desc">Common formatting options for simple content editing.</p>
+            <textarea id="editor-basic" class="mublo-editor"
+                data-toolbar="basic"
+                data-height="200"
+                data-locale="en"
+                data-placeholder="Basic editor with essential formatting...">
+            </textarea>
+        </div>
+
+        <!-- Minimal Toolbar -->
+        <div class="demo-section">
+            <h2>Minimal Toolbar</h2>
+            <p class="desc">Just bold, italic, and links — perfect for comments or short inputs.</p>
+            <textarea id="editor-minimal" class="mublo-editor"
+                data-toolbar="minimal"
+                data-height="120"
+                data-locale="en"
+                data-placeholder="Minimal editor for quick notes...">
+            </textarea>
+        </div>
+
+        <!-- Plugin Example -->
+        <div class="demo-section">
+            <h2>Plugin: Custom Upload Handler</h2>
+            <p class="desc">Demonstrates the plugin system with a mock image uploader.</p>
+            <textarea id="editor-plugin"></textarea>
+        </div>
+    </div>
+
+    <footer>
+        <p>MubloEditor v1.3.0 &middot; <a href="https://github.com/mublo/mublo-editor">GitHub</a> &middot; MIT License</p>
+    </footer>
+
+    <script src="../src/MubloEditor.js"></script>
+    <script>
+        // Plugin example: mock image uploader
+        MubloEditor.registerPlugin('mockUploader', (editor) => {
+            editor.setImageUploadHandler(async (blobInfo, progress) => {
+                // Simulate upload with progress
+                for (let i = 0; i <= 100; i += 20) {
+                    await new Promise(r => setTimeout(r, 200));
+                    progress(i);
+                }
+                // Return a placeholder image URL
+                return `https://picsum.photos/seed/${Date.now()}/800/400`;
+            });
+        });
+
+        // Create plugin demo editor programmatically
+        const pluginEditor = MubloEditor.create('#editor-plugin', {
+            toolbar: 'basic',
+            height: 200,
+            locale: 'en',
+            placeholder: 'Try pasting or dragging an image here...',
+        });
+
+        // Theme toggle
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            document.documentElement.setAttribute('data-theme', isDark ? '' : 'dark');
+        });
+
+        // Locale toggle
+        document.getElementById('locale-select').addEventListener('change', (e) => {
+            MubloEditor.setLocale(e.target.value);
+            // Rebuild all editors to apply new locale
+            const states = {};
+            MubloEditor.getAll().forEach(ed => {
+                states[ed.id] = ed.getHTML();
+                ed.destroy();
+            });
+            // Re-init auto editors
+            document.querySelectorAll('.mublo-editor').forEach(el => {
+                el.setAttribute('data-locale', e.target.value);
+            });
+            document.querySelectorAll('.mublo-editor').forEach(el => {
+                const ed = MubloEditor.create(el);
+                if (ed && states[ed.id]) ed.setHTML(states[ed.id]);
+            });
+            // Re-init plugin editor
+            const pe = MubloEditor.create('#editor-plugin', {
+                toolbar: 'basic', height: 200, locale: e.target.value,
+                placeholder: 'Try pasting or dragging an image here...',
+            });
+        });
+
+        // Readonly toggle
+        document.getElementById('readonly-toggle').addEventListener('click', () => {
+            MubloEditor.getAll().forEach(ed => {
+                ed.setReadonly(!ed.isReadonly());
+            });
+        });
+
+        // Get HTML
+        document.getElementById('get-html').addEventListener('click', () => {
+            const editor = MubloEditor.get('editor-full');
+            if (editor) {
+                document.getElementById('output-full').textContent = editor.getHTML();
+                document.querySelector('.demo-output').open = true;
+            }
+        });
+
+        // Live HTML output
+        const fullEditor = MubloEditor.get('editor-full');
+        if (fullEditor) {
+            fullEditor.on('change', (e) => {
+                document.getElementById('output-full').textContent = e.content;
+            });
+        }
+    </script>
+</body>
+</html>
