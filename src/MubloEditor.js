@@ -145,6 +145,7 @@ const MubloEditor = (() => {
     let _activeInstanceLocale = null;
 
     function _t(key, params = {}) {
+        if (typeof key !== 'string') return key;
         const loc = _activeInstanceLocale || _globalLocale;
         const str = LOCALE[loc]?.[key] ?? LOCALE.ko[key] ?? key;
         if (typeof str !== 'string') return str;
@@ -516,7 +517,7 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 이벤트 시스템
+        // Event system
         // =========================================================
         on(event, callback) {
             if (!this._eventListeners.has(event)) {
@@ -551,7 +552,7 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 이미지 업로드 핸들러 설정 (플러그인용)
+        // Image upload handler setup (for plugins)
         // =========================================================
         setImageUploadHandler(handler) {
             if (typeof handler !== 'function') {
@@ -567,7 +568,7 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 빌드
+        // Build
         // =========================================================
         _build() {
             this.wrapper = document.createElement('div');
@@ -593,20 +594,20 @@ const MubloEditor = (() => {
             this.sourceArea.style.height = this.options.height + 'px';
             this.wrapper.appendChild(this.sourceArea);
 
-            // 업로드 진행률 표시 영역
+            // Upload progress bar area
             this.progressBar = document.createElement('div');
             this.progressBar.className = 'mublo-editor-progress';
             this.progressBar.style.display = 'none';
             this.progressBar.innerHTML = '<div class="mublo-editor-progress-bar"></div>';
             this.wrapper.appendChild(this.progressBar);
 
-            // 이미지 리사이저 요소 생성
+            // Create image resizer element
             this._resizer = document.createElement('div');
             this._resizer.className = 'mublo-editor-resizer';
             this._resizer.innerHTML = '<div class="mublo-editor-resizer-handle mublo-editor-resizer-nw"></div><div class="mublo-editor-resizer-handle mublo-editor-resizer-ne"></div><div class="mublo-editor-resizer-handle mublo-editor-resizer-sw"></div><div class="mublo-editor-resizer-handle mublo-editor-resizer-se"></div>';
             this.wrapper.appendChild(this._resizer);
 
-            // 글자 수 카운터
+            // Character counter
             if (this.options.showWordCount) {
                 this.statusBar = document.createElement('div');
                 this.statusBar.className = 'mublo-editor-statusbar';
@@ -617,7 +618,7 @@ const MubloEditor = (() => {
             this.originalElement.style.display = 'none';
             this.originalElement.parentNode.insertBefore(this.wrapper, this.originalElement.nextSibling);
 
-            // 엔터 키 입력 시 <div> 대신 <p> 태그가 생성되도록 설정
+            // Ensure Enter key creates <p> tags instead of <div>
             this._ensureParagraphSeparator();
         }
 
@@ -645,7 +646,7 @@ const MubloEditor = (() => {
             try {
                 document.execCommand('defaultParagraphSeparator', false, 'p');
             } catch (e) {
-                // 브라우저 호환성 예외 처리
+                // Browser compatibility fallback
             }
 
             try {
@@ -654,24 +655,24 @@ const MubloEditor = (() => {
                 try {
                     document.execCommand('useCSS', false, false);
                 } catch (ignored) {
-                    // 브라우저 호환성 예외 처리
+                    // Browser compatibility fallback
                 }
             }
         }
 
         /**
-         * Backspace로 전부 지웠을 때 빈 contentEditable 보정
-         * 빈 상태에서 타이핑하면 브라우저마다 커서가 불안정 → <p><br></p> 삽입 + 커서 배치
+         * Fix empty contentEditable after deleting all content with Backspace
+         * Typing in empty state causes unstable cursor across browsers — insert <p><br></p> + position cursor
          */
         _ensureNotEmpty() {
             const root = this.contentArea;
             if (!root || this.isSourceMode) return;
 
-            // 내용이 비었거나 <br> 하나만 남은 상태
+            // Empty or only a single <br> remaining
             const html = root.innerHTML;
             if (html === '' || html === '<br>' || html === '<br/>' || html.trim() === '') {
                 root.innerHTML = '<p><br></p>';
-                // 커서를 <p> 안에 배치
+                // Position cursor inside <p>
                 const p = root.querySelector('p');
                 if (p) {
                     const sel = window.getSelection();
@@ -827,8 +828,8 @@ const MubloEditor = (() => {
         }
 
         /**
-         * font 태그 → span 변환 (지정된 root 요소에서 수행)
-         * getHTML()에서는 클론에서 호출 → 라이브 DOM 보호
+         * Convert font tags to span (performed on the given root element)
+         * Called on clone in getHTML() — preserves live DOM
          */
         _normalizeFormattingMarkupOn(root) {
             if (!root) return;
@@ -881,7 +882,7 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 모달 시스템
+        // Modal system
         // =========================================================
         _createModal(title, bodyHtml, primaryBtnText = null, onPrimaryClick = null) {
             if (primaryBtnText === null) primaryBtnText = _t('confirm');
@@ -934,7 +935,7 @@ const MubloEditor = (() => {
                 });
             }
 
-            // ESC 닫기
+            // Close on ESC
             const escHandler = (e) => {
                 if (e.key === 'Escape') {
                     closeModal();
@@ -943,7 +944,7 @@ const MubloEditor = (() => {
             };
             document.addEventListener('keydown', escHandler);
 
-            // 첫 번째 입력창 포커스
+            // Focus first input
             const firstInput = modal.querySelector('input, select, textarea');
             if (firstInput) setTimeout(() => firstInput.focus(), 50);
 
@@ -983,17 +984,17 @@ const MubloEditor = (() => {
         }
 
         _openImageDialog() {
-            // 현재 커서 위치 저장 (모달이 열리면 포커스 소실)
+            // Save cursor position (focus is lost when modal opens)
             this._saveSelection();
             this._openImageModal();
         }
 
         _openImageModal() {
-            // 기존 모달이 있으면 제거
+            // Remove existing modal if present
             const existingModal = document.getElementById('mublo-editor-modal');
             if (existingModal) existingModal.remove();
 
-            // 모달 생성
+            // Create modal
             const modal = document.createElement('div');
             modal.id = 'mublo-editor-modal';
             modal.className = 'mublo-editor-modal';
@@ -1038,14 +1039,14 @@ const MubloEditor = (() => {
             document.body.appendChild(modal);
             this._pendingImages = [];
 
-            // 교체 모드일 때 UI 조정
+            // Adjust UI for replace mode
             if (this._replacingImage) {
                 modal.querySelector('.mublo-editor-modal-header h5').textContent = _t('imageReplace');
                 modal.querySelector('#mublo-editor-image-insert').textContent = _t('replace');
             }
 
-            // 외부 미디어 피커 확장 지점 (플러그인/패키지에서 탭 추가 가능)
-            // 사용: editor.on('imageModalReady', function(e) { /* 탭 추가 */ })
+            // Extension point for external media pickers (plugins/packages can add tabs)
+            // Usage: editor.on('imageModalReady', function(e) { /* add tabs */ })
             this.fire('imageModalReady', { modal: modal });
 
             this._setupImageModal(modal);
@@ -1064,7 +1065,7 @@ const MubloEditor = (() => {
             const countEl = modal.querySelector('#mublo-editor-image-count');
             const dragHint = modal.querySelector('#mublo-editor-drag-hint');
 
-            // 파일 선택
+            // File selection
             uploadZone.addEventListener('click', () => fileInput.click());
 
             fileInput.addEventListener('change', () => {
@@ -1072,7 +1073,7 @@ const MubloEditor = (() => {
                 fileInput.value = '';
             });
 
-            // 드래그 앤 드롭
+            // Drag and drop
             uploadZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 uploadZone.classList.add('mublo-editor-image-upload-zone-active');
@@ -1087,7 +1088,7 @@ const MubloEditor = (() => {
                 this._addFilesToPreview(files, previewList, countEl, insertBtn, dragHint);
             });
 
-            // URL로 추가
+            // Add by URL
             urlAddBtn.addEventListener('click', () => {
                 const url = urlInput.value.trim();
                 if (url) {
@@ -1102,7 +1103,7 @@ const MubloEditor = (() => {
                 }
             });
 
-            // 닫기
+            // Close
             const closeModal = () => {
                 modal.classList.add('mublo-editor-modal-closing');
                 setTimeout(() => modal.remove(), 200);
@@ -1113,7 +1114,7 @@ const MubloEditor = (() => {
             cancelBtn.addEventListener('click', closeModal);
             backdrop.addEventListener('click', closeModal);
 
-            // 삽입
+            // Insert
             insertBtn.addEventListener('click', async () => {
                 insertBtn.disabled = true;
                 insertBtn.textContent = _t('uploading');
@@ -1129,7 +1130,7 @@ const MubloEditor = (() => {
                 closeModal();
             });
 
-            // ESC로 닫기
+            // Close on ESC
             const escHandler = (e) => {
                 if (e.key === 'Escape') {
                     closeModal();
@@ -1138,7 +1139,7 @@ const MubloEditor = (() => {
             };
             document.addEventListener('keydown', escHandler);
 
-            // 드래그로 순서 변경
+            // Drag to reorder
             this._setupPreviewDragSort(previewList);
         }
 
@@ -1174,7 +1175,7 @@ const MubloEditor = (() => {
                 <span class="mublo-editor-image-preview-order">${this._pendingImages.length}</span>
             `;
 
-            // 제거 버튼
+            // Remove button
             item.querySelector('.mublo-editor-image-preview-remove').addEventListener('click', (e) => {
                 e.stopPropagation();
                 this._pendingImages = this._pendingImages.filter(img => img.id !== id);
@@ -1233,7 +1234,7 @@ const MubloEditor = (() => {
 
             previewList.addEventListener('drop', (e) => {
                 e.preventDefault();
-                // 순서 재정렬
+                // Reorder items
                 const newOrder = [];
                 previewList.querySelectorAll('.mublo-editor-image-preview-item').forEach(item => {
                     const id = item.dataset.id;
@@ -1260,18 +1261,18 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 이미지 업로드 처리 (플러그인 지원)
+        // Image upload handling (plugin support)
         // =========================================================
         async _handleImageUpload(file) {
             _activeInstanceLocale = this._locale;
-            // 파일 타입 체크
+            // File type check
             if (!this.options.allowedImageTypes.includes(file.type)) {
                 this.fire('uploadError', { error: _t('invalidImageType'), file });
                 this._showToast(_t('invalidImageType'), 'error');
                 return;
             }
 
-            // 파일 크기 체크
+            // File size check
             if (file.size > this.options.maxFileSize) {
                 const maxMB = (this.options.maxFileSize / 1024 / 1024).toFixed(1);
                 this.fire('uploadError', { error: _t('fileTooLarge', { size: maxMB }), file });
@@ -1279,42 +1280,42 @@ const MubloEditor = (() => {
                 return;
             }
 
-            // BlobInfo 생성
+            // Create BlobInfo
             const base64 = await fileToBase64(file);
             const blobInfo = new BlobInfo(file, base64);
 
-            // 진행률 콜백
+            // Progress callback
             const progress = (percent) => {
                 this._showProgress(percent);
                 this.fire('uploadProgress', { percent, blobInfo });
             };
 
-            // 업로드 시작 이벤트
+            // Upload start event
             this.fire('uploadStart', { blobInfo });
 
             try {
                 let imageUrl;
 
-                // 1. 플러그인에서 설정한 핸들러 (최우선)
+                // 1. Plugin-set handler (highest priority)
                 if (this._imageUploadHandler) {
                     imageUrl = await this._imageUploadHandler(blobInfo, progress);
                 }
-                // 2. 옵션으로 전달된 레거시 스타일 핸들러
+                // 2. Legacy-style handler passed via options
                 else if (this.options.images_upload_handler) {
                     imageUrl = await new Promise((resolve, reject) => {
                         this.options.images_upload_handler(blobInfo, resolve, reject, progress);
                     });
                 }
-                // 3. 옵션으로 전달된 콜백 (하위 호환성)
+                // 3. Callback passed via options (backward compatibility)
                 else if (this.options.onImageUpload) {
                     const result = await this.options.onImageUpload(file, this);
                     imageUrl = result?.url;
                 }
-                // 4. uploadUrl 설정된 경우 기본 업로드
+                // 4. Default upload when uploadUrl is set
                 else if (this.options.uploadUrl) {
                     imageUrl = await this._defaultUpload(blobInfo, progress);
                 }
-                // 5. 폴백: Base64 인라인 (권장하지 않음)
+                // 5. Fallback: Base64 inline (not recommended)
                 else {
                     console.warn('[MubloEditor] No uploadUrl configured. Using Base64 inline embedding. This may cause storage issues. Set the uploadUrl option.');
                     imageUrl = `data:${file.type};base64,${base64}`;
@@ -1420,7 +1421,7 @@ const MubloEditor = (() => {
                 return `https://player.vimeo.com/video/${match[1]}`;
             }
 
-            // 이미 embed URL인 경우
+            // Already an embed URL
             if (url.includes('youtube.com/embed/') || url.includes('player.vimeo.com/')) {
                 return url;
             }
@@ -1438,11 +1439,11 @@ const MubloEditor = (() => {
             `;
 
             const modal = this._createModal(_t('tableInsert'), body, _t('insert'), () => {
-                // 그리드 클릭 시 이미 삽입되므로 확인 버튼은 닫기 역할만 하거나 비활성화
+                // Grid click already inserts, so confirm button just closes
                 return true;
             });
 
-            // 그리드 생성 (10x10)
+            // Create grid (10x10)
             const grid = modal.querySelector('#mublo-editor-table-grid');
             const info = modal.querySelector('#mublo-editor-table-info');
             
@@ -1525,7 +1526,7 @@ const MubloEditor = (() => {
                 this.contentArea.style.display = 'block';
             }
 
-            // 툴바 버튼 활성/비활성화 처리 (소스 모드에서는 편집 도구 잠금)
+            // Toggle toolbar buttons (lock editing tools in source mode)
             this.toolbar.querySelectorAll('.mublo-editor-btn').forEach(btn => {
                 const cmd = btn.dataset.cmd;
                 if (cmd !== 'source' && cmd !== 'fullscreen') {
@@ -1540,7 +1541,7 @@ const MubloEditor = (() => {
         }
 
         _formatHTML(html) {
-            // 블록 태그 주위에 줄바꿈을 추가하여 가독성을 높임 (내용은 건드리지 않음)
+            // Add line breaks around block tags for readability (content untouched)
             const tokens = html.split(/(<[^>]+>)/g);
             let formatted = '';
             const blockTags = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'table', 'tbody', 'thead', 'tfoot', 'tr', 'td', 'th', 'blockquote', 'pre', 'hr', 'header', 'footer', 'section', 'article', 'aside', 'nav', 'style'];
@@ -1558,11 +1559,11 @@ const MubloEditor = (() => {
                     if (isBlock) {
                         const isClosing = token.startsWith('</');
                         if (!isClosing) {
-                            // 여는 태그: 앞에 줄바꿈
+                            // Opening tag: newline before
                             if (formatted.length > 0 && !formatted.endsWith('\n')) formatted += '\n';
                             formatted += token;
                         } else {
-                            // 닫는 태그: 뒤에 줄바꿈
+                            // Closing tag: newline after
                             formatted += token;
                             if (i < tokens.length - 1) formatted += '\n';
                         }
@@ -1574,12 +1575,12 @@ const MubloEditor = (() => {
                 }
             }
             
-            // 연속된 줄바꿈 제거 및 정리
+            // Remove consecutive newlines and trim
             return formatted.replace(/\n\s*\n/g, '\n').trim();
         }
 
         // =========================================================
-        // 찾기/바꾸기
+        // Find/Replace
         // =========================================================
         _toggleFindReplace() {
             if (this.findReplaceBar && this.findReplaceBar.style.display !== 'none') {
@@ -1628,7 +1629,7 @@ const MubloEditor = (() => {
                 </button>
             `;
 
-            // 이벤트 바인딩
+            // Event binding
             const findInput = this.findReplaceBar.querySelector('.mublo-editor-find-input');
             const replaceInput = this.findReplaceBar.querySelector('.mublo-editor-replace-input');
 
@@ -1777,7 +1778,7 @@ const MubloEditor = (() => {
 
             this._clearHighlights();
 
-            // innerHTML에서 직접 치환 (텍스트만)
+            // Replace directly in text nodes
             const walker = document.createTreeWalker(this.contentArea, NodeFilter.SHOW_TEXT, null, false);
             const textNodes = [];
             while (walker.nextNode()) {
@@ -1806,7 +1807,7 @@ const MubloEditor = (() => {
         }
 
         _bindEvents() {
-            // 한국어 IME 조합 상태 추적
+            // Track Korean IME composition state
             this._isComposing = false;
             this.contentArea.addEventListener('compositionstart', () => {
                 this._isComposing = true;
@@ -1814,11 +1815,11 @@ const MubloEditor = (() => {
             this.contentArea.addEventListener('compositionend', () => {
                 this._isComposing = false;
                 this._enforceMaxLength();
-                this._onChange(); // 조합 완료 후 반영
+                this._onChange(); // Sync after composition ends
             });
 
             this.contentArea.addEventListener('input', () => {
-                if (this._isComposing) return; // IME 조합 중에는 무시
+                if (this._isComposing) return; // Ignore during IME composition
                 this._enforceMaxLength();
                 this._onChange();
             });
@@ -1836,7 +1837,7 @@ const MubloEditor = (() => {
             });
             this.contentArea.addEventListener('keydown', e => this._onKeydown(e));
             this.contentArea.addEventListener('keyup', e => {
-                // Backspace/Delete 후 빈 상태 보정 — keyup에서 처리해야 삭제가 완료된 후 체크
+                // Fix empty state after Backspace/Delete — check on keyup after deletion completes
                 if (e.key === 'Backspace' || e.key === 'Delete') {
                     this._ensureNotEmpty();
                 }
@@ -1845,7 +1846,7 @@ const MubloEditor = (() => {
             this.contentArea.addEventListener('drop', e => this._onDrop(e));
             this.contentArea.addEventListener('dragover', e => e.preventDefault());
             
-            // 전역 클릭 핸들러 (드롭다운 닫기)
+            // Global click handler (close dropdowns)
             this._handlers.docClick = (e) => {
                 if (this.toolbar && !this.toolbar.contains(e.target)) this._closeAllDropdowns();
             };
@@ -1860,7 +1861,7 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 자동 저장
+        // Autosave
         // =========================================================
         _getAutosaveKey() {
             return this.options.autosaveKey || `mublo-editor-autosave-${this.id}`;
@@ -1869,7 +1870,7 @@ const MubloEditor = (() => {
         _initAutosave() {
             if (!this.options.autosave) return;
 
-            // 저장된 내용 복원 — confirm 대신 이벤트 + 배너 UI
+            // Restore saved content — event + banner UI instead of confirm
             if (this.options.autosaveRestore) {
                 const saved = this.getAutosavedContent();
                 if (saved && saved.content && !this.originalElement.value) {
@@ -1881,7 +1882,7 @@ const MubloEditor = (() => {
                 }
             }
 
-            // 주기적 자동 저장 시작
+            // Start periodic autosave
             this._startAutosave();
         }
 
@@ -1962,10 +1963,10 @@ const MubloEditor = (() => {
         }
 
         _onKeydown(e) {
-            // IME 조합 중에는 단축키 처리 안 함
+            // Skip shortcuts during IME composition
             if (this._isComposing || e.isComposing) return;
 
-            // 이미지 선택 상태에서 Delete/Backspace → 이미지 삭제
+            // Delete/Backspace with image selected — remove image
             if (this._selectedImage && (e.key === 'Delete' || e.key === 'Backspace')) {
                 e.preventDefault();
                 this._selectedImage.remove();
@@ -1974,7 +1975,8 @@ const MubloEditor = (() => {
                 return;
             }
 
-            const mod = navigator.platform.includes('Mac') ? e.metaKey : e.ctrlKey;
+            const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+            const mod = isMac ? e.metaKey : e.ctrlKey;
             if (mod) {
                 const key = e.key.toLowerCase();
                 if (key === 'b') { e.preventDefault(); this._exec('bold'); }
@@ -1994,7 +1996,7 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 마크다운 단축키
+        // Markdown shortcuts
         // =========================================================
         _initMarkdownShortcuts() {
             this.contentArea.addEventListener('keyup', (e) => {
@@ -2005,19 +2007,19 @@ const MubloEditor = (() => {
         }
 
         _checkMarkdown(e) {
-            if (this._isComposing) return; // IME 조합 중 무시
+            if (this._isComposing) return; // Ignore during IME composition
             const sel = window.getSelection();
             if (!sel.isCollapsed) return;
 
             const node = sel.anchorNode;
-            if (node.nodeType !== 3) return; // 텍스트 노드만 처리
+            if (node.nodeType !== 3) return; // Only process text nodes
 
             const text = node.textContent;
             const offset = sel.anchorOffset;
-            // 입력된 문자 바로 앞까지의 텍스트 확인
+            // Check text up to the character just entered
             const prefix = text.substring(0, offset).trim(); 
 
-            // 패턴 매칭
+            // Pattern matching
             let cmd = null;
             let val = null;
 
@@ -2030,15 +2032,14 @@ const MubloEditor = (() => {
                 else if (prefix === '1.') { cmd = 'insertOrderedList'; removeLen = 2; }
                 else if (prefix === '>') { cmd = 'formatBlock'; val = 'blockquote'; removeLen = 1; }
             } else if (e.key === 'Enter') {
-                // --- 입력 후 엔터 시 수평선
-                // 엔터 키 입력 시점에는 이미 줄바꿈이 일어났을 수 있으므로 이전 줄 확인 필요
-                // 여기서는 간단히 현재 블록의 텍스트가 '---' 인지 확인하는 방식보다는
-                // keyup 이벤트라 이미 줄바꿈 된 상태일 수 있어 처리가 복잡할 수 있음.
-                // 간단하게 '---' 감지는 생략하거나 input 이벤트에서 처리 권장.
+                // --- followed by Enter → horizontal rule
+                // At keyup time, line break may already have occurred so previous line check needed.
+                // Since this is a keyup event, the line break may already exist making this complex.
+                // Simple '---' detection is omitted; recommend handling in input event instead.
             }
 
             if (cmd) {
-                // 마크다운 문법 문자 제거
+                // Remove markdown syntax characters
                 const range = document.createRange();
                 range.setStart(node, 0);
                 range.setEnd(node, offset);
@@ -2050,7 +2051,7 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 토스트 메시지
+        // Toast messages
         // =========================================================
         _showToast(message, type = 'info') {
             const toast = document.createElement('div');
@@ -2062,7 +2063,7 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 이미지 hover 교체 안내 툴팁
+        // Image hover replace tooltip
         // =========================================================
         _showImageTooltip(img) {
             this._hideImageTooltip();
@@ -2099,10 +2100,10 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
-        // 이미지 리사이저
+        // Image resizer
         // =========================================================
         _initImageResizer() {
-            // 이미지 클릭 시 리사이저 표시
+            // Show resizer on image click
             this.contentArea.addEventListener('click', (e) => {
                 if (e.target.tagName === 'IMG') {
                     this._selectImage(e.target);
@@ -2111,7 +2112,7 @@ const MubloEditor = (() => {
                 }
             });
 
-            // 이미지 hover 시 교체 안내 툴팁
+            // Show replace tooltip on image hover
             this._imgTooltip = null;
             this._imgTooltipTimer = null;
 
@@ -2126,25 +2127,25 @@ const MubloEditor = (() => {
                 this._imgTooltipTimer = setTimeout(() => this._hideImageTooltip(), 1500);
             }, true);
 
-            // 이미지 더블클릭 시 교체 다이얼로그 열기
+            // Open replace dialog on image double-click
             this.contentArea.addEventListener('dblclick', (e) => {
                 if (e.target.tagName === 'IMG') {
                     e.preventDefault();
                     e.stopPropagation();
                     this._replacingImage = e.target;
-                    // 모달 열기 전 잠깐 지연 — click 이벤트 처리 완료 후 실행
+                    // Brief delay before opening modal — runs after click event completes
                     setTimeout(() => this._openImageModal(), 0);
                 }
             });
 
-            // 스크롤 시 리사이저 위치 업데이트
+            // Update resizer position on scroll
             this.contentArea.addEventListener('scroll', () => this._updateResizerPosition());
             
-            // 윈도우 리사이즈 핸들러
+            // Window resize handler
             this._handlers.winResize = () => this._updateResizerPosition();
             window.addEventListener('resize', this._handlers.winResize);
 
-            // 핸들 드래그
+            // Handle drag
             let startX, startY, startWidth, startHeight, activeHandle;
 
             const onMouseMove = (e) => {
@@ -2157,7 +2158,7 @@ const MubloEditor = (() => {
                 let newWidth = startWidth;
                 let newHeight = startHeight;
 
-                // 비율 유지하며 크기 조절 (간단하게 가로 기준)
+                // Resize while maintaining aspect ratio (based on width)
                 if (activeHandle.classList.contains('mublo-editor-resizer-se') || activeHandle.classList.contains('mublo-editor-resizer-ne')) {
                     newWidth = startWidth + dx;
                 } else {
@@ -2166,7 +2167,7 @@ const MubloEditor = (() => {
 
                 if (newWidth > 20) {
                     this._selectedImage.style.width = newWidth + 'px';
-                    this._selectedImage.style.height = 'auto'; // 비율 유지
+                    this._selectedImage.style.height = 'auto'; // Maintain aspect ratio
                     this._updateResizerPosition();
                 }
             };
@@ -2175,7 +2176,7 @@ const MubloEditor = (() => {
                 activeHandle = null;
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
-                this._onChange(); // 변경 사항 저장
+                this._onChange(); // Save changes
             };
 
             this._resizer.addEventListener('mousedown', (e) => {
@@ -2198,8 +2199,8 @@ const MubloEditor = (() => {
             this._resizer.classList.add('active');
             this._updateResizerPosition();
 
-            // contentArea에 포커스 확보 후 커서를 이미지 직후에 위치
-            // selectNode 대신 setStartAfter 사용 — 브라우저 파란 selection 하이라이트 방지
+            // Focus contentArea and position cursor right after the image
+            // Use setStartAfter instead of selectNode — prevents browser blue selection highlight
             this.contentArea.focus();
             try {
                 const range = document.createRange();
@@ -2209,7 +2210,7 @@ const MubloEditor = (() => {
                 sel.removeAllRanges();
                 sel.addRange(range);
             } catch (e) {
-                // 범위 설정 실패 시 포커스만 유지
+                // Keep focus only if range setup fails
             }
         }
 
@@ -2224,7 +2225,7 @@ const MubloEditor = (() => {
             const imgRect = this._selectedImage.getBoundingClientRect();
             const wrapperRect = this.wrapper.getBoundingClientRect();
 
-            // wrapper 기준 상대 좌표 계산
+            // Calculate relative coordinates based on wrapper
             const top = imgRect.top - wrapperRect.top;
             const left = imgRect.left - wrapperRect.left;
 
@@ -2273,7 +2274,7 @@ const MubloEditor = (() => {
             if (!max || max <= 0) return;
             const text = this.getText();
             if (text.length > max) {
-                // Selection API로 초과분 truncate — IME 완료 후에만 동작
+                // Truncate excess via Selection API — only runs after IME completion
                 const sel = window.getSelection();
                 const range = document.createRange();
                 const walker = document.createTreeWalker(this.contentArea, NodeFilter.SHOW_TEXT, null, false);
@@ -2283,9 +2284,9 @@ const MubloEditor = (() => {
                     const remaining = max - charCount;
                     if (charCount + node.textContent.length > max) {
                         node.textContent = node.textContent.substring(0, remaining);
-                        // 이후 노드 제거
+                        // Remove subsequent nodes
                         while (walker.nextNode()) walker.currentNode.textContent = '';
-                        // 커서를 truncate 지점에 배치
+                        // Position cursor at truncation point
                         range.setStart(node, node.textContent.length);
                         range.collapse(true);
                         sel.removeAllRanges();
@@ -2300,11 +2301,11 @@ const MubloEditor = (() => {
         }
 
         _onChange() {
-            // 입력 중에는 DOM을 건드리지 않는 경량 동기화만 수행
-            // (getHTML()은 _normalizeFormattingMarkup()으로 DOM을 수정해서 커서가 날아감)
+            // Lightweight sync only during input — avoids touching DOM
+            // (getHTML() modifies DOM via _normalizeFormattingMarkup(), which breaks cursor)
             this._syncLight();
             this._updateWordCount();
-            // 콜백은 debounce로 지연 실행 (입력 중 커서 보호)
+            // Debounce callbacks to protect cursor during input
             clearTimeout(this._changeDebounce);
             this._changeDebounce = setTimeout(() => {
                 this.options.onChange?.(this.getHTML(), this);
@@ -2312,7 +2313,7 @@ const MubloEditor = (() => {
             }, 300);
         }
 
-        /** 경량 동기화 — DOM 수정 없이 innerHTML만 textarea에 반영 */
+        /** Lightweight sync — copy innerHTML to textarea without modifying DOM */
         _syncLight() {
             if (this.isSourceMode) {
                 this.originalElement.value = this.sourceArea.value;
@@ -2354,13 +2355,13 @@ const MubloEditor = (() => {
         getHTML() {
             let html = this.isSourceMode ? this.sourceArea.value : this.contentArea.innerHTML;
             if (!this.isSourceMode) {
-                // 클론에서 normalize 수행 — 라이브 DOM을 건드리지 않아 커서 보호
+                // Normalize on clone — preserves cursor in live DOM
                 const clone = this.contentArea.cloneNode(true);
                 this._normalizeFormattingMarkupOn(clone);
                 html = clone.innerHTML;
             }
             html = this._formatHTML(convertCodeShortcodesToHtml(html));
-            // 앞뒤 빈 <p> 태그 제거 (<p><br></p>, <p>&nbsp;</p>, <p></p> 등)
+            // Strip leading/trailing empty <p> tags (<p><br></p>, <p>&nbsp;</p>, <p></p>, etc.)
             html = html.replace(/^(\s*<p[^>]*>\s*(<br\s*\/?>|&nbsp;)?\s*<\/p>\s*)+/i, '');
             html = html.replace(/(\s*<p[^>]*>\s*(<br\s*\/?>|&nbsp;)?\s*<\/p>\s*)+$/i, '');
             return html;
@@ -2370,11 +2371,11 @@ const MubloEditor = (() => {
             let safe = this.options.sanitize ? sanitizeHtml(html) : html;
             safe = convertCodeShortcodesToHtml(safe);
             
-            // 1. 내용이 없으면 기본 P 태그 삽입 (첫 줄 div 방지)
+            // 1. Insert default P tag if empty (prevent first-line div)
             if (!safe && !this.options.readonly) {
                 safe = '<p><br></p>';
             } else if (!this.options.readonly) {
-                // 2. 내용이 블록 태그로 시작하지 않으면 <p>로 감싸기 (평문 초기화 대응)
+                // 2. Wrap in <p> if content doesn't start with a block tag (plain text init)
                 const trimmed = safe.trim();
                 const blockTags = ['<p', '<div', '<h1', '<h2', '<h3', '<h4', '<h5', '<h6', '<ul', '<ol', '<table', '<blockquote', '<pre', '<hr', '<style', '<section', '<article', '<header', '<footer', '<nav', '<aside'];
                 const startsWithBlock = blockTags.some(tag => trimmed.toLowerCase().startsWith(tag));
@@ -2410,7 +2411,7 @@ const MubloEditor = (() => {
             this.sourceArea.readOnly = readonly;
             this.wrapper.classList.toggle('mublo-editor-readonly', readonly);
 
-            // 툴바 버튼 비활성화
+            // Disable toolbar buttons
             this.toolbar.querySelectorAll('.mublo-editor-btn').forEach(btn => {
                 btn.disabled = readonly;
             });
@@ -2433,7 +2434,7 @@ const MubloEditor = (() => {
         }
 
         insertImage(url, alt = '') {
-            // 교체 모드: 기존 이미지의 src를 교체
+            // Replace mode: swap the existing image src
             if (this._replacingImage) {
                 this._replacingImage.src = url;
                 if (alt) this._replacingImage.alt = alt;
@@ -2466,7 +2467,7 @@ const MubloEditor = (() => {
             this._stopAutosave();
             this.originalElement.style.display = '';
             
-            // 전역 리스너 제거
+            // Remove global listeners
             if (this._handlers.docClick) document.removeEventListener('click', this._handlers.docClick);
             if (this._handlers.winResize) window.removeEventListener('resize', this._handlers.winResize);
             
@@ -2482,7 +2483,7 @@ const MubloEditor = (() => {
     }
 
     // =========================================================
-    // 자동 초기화
+    // Auto-initialization
     // =========================================================
     function autoInit() {
         document.querySelectorAll(`.${EDITOR_CLASS}`).forEach(el => {
@@ -2517,7 +2518,7 @@ const MubloEditor = (() => {
         registerPlugin(name, fn) {
             if (typeof fn !== 'function') return false;
             plugins.set(name, fn);
-            // 이미 생성된 에디터에도 적용
+            // Apply to already-created editors
             instances.forEach(e => { try { fn(e); } catch (err) { console.error(err); } });
             return true;
         },
@@ -2538,7 +2539,7 @@ const MubloEditor = (() => {
 
         getLocale() { return _globalLocale; },
 
-        // 상수 노출
+        // Expose constants
         TOOLBAR_ITEMS: _getToolbarItems,
         TOOLBAR_PRESETS,
         DEFAULT_COLORS,

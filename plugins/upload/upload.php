@@ -211,11 +211,39 @@ class MubloEditorUploader {
     }
 
     /**
-     * HTTP 요청을 처리하는 메인 핸들러 (AJAX 호출용)
+     * Sanitize folder path — allow alphanumeric, underscore, hyphen, slash.
+     * Prevents traversal (..), leading slash, consecutive slashes.
+     */
+    private static function sanitizeFolder(string $folder): string
+    {
+        $folder = preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $folder);
+        $folder = preg_replace('#\.\.+#', '', $folder);
+        $folder = preg_replace('#/{2,}#', '/', $folder);  // collapse consecutive slashes
+        $folder = trim($folder, '/');
+        return $folder;
+    }
+
+    /**
+     * HTTP request handler (for AJAX calls)
      */
     public static function handleRequest(): void
     {
-        $config = self::getConfig();
+        // Fileinfo extension check
+        if (!class_exists('finfo')) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'MISSING_FINFO', 'message' => 'PHP fileinfo extension is required.']);
+            exit;
+        }
+
+        try {
+            $config = self::getConfig();
+        } catch (\Throwable $e) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'CONFIG_ERROR', 'message' => 'Configuration error: ' . $e->getMessage()]);
+            exit;
+        }
 
         header('Content-Type: application/json; charset=utf-8');
 
@@ -257,14 +285,8 @@ class MubloEditorUploader {
             }
 
             $fileName = basename($_REQUEST['file'] ?? '');
-            $targetFolder = preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $_REQUEST['target'] ?? '');
-            $fromFolder = preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $_REQUEST['from'] ?? ($config['temp_folder'] ?? 'temp'));
-
-            // Directory traversal 방어
-            $targetFolder = preg_replace('#\.\.+#', '', $targetFolder);
-            $targetFolder = trim($targetFolder, '/');
-            $fromFolder = preg_replace('#\.\.+#', '', $fromFolder);
-            $fromFolder = trim($fromFolder, '/');
+            $targetFolder = self::sanitizeFolder($_REQUEST['target'] ?? '');
+            $fromFolder = self::sanitizeFolder($_REQUEST['from'] ?? ($config['temp_folder'] ?? 'temp'));
 
             if (!$fileName || !$targetFolder) {
                 http_response_code(400);
@@ -291,12 +313,8 @@ class MubloEditorUploader {
         }
 
         // [기능 2] 파일 업로드
-        $folder = preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $_REQUEST['folder'] ?? ($config['temp_folder'] ?? 'temp'));
+        $folder = self::sanitizeFolder($_REQUEST['folder'] ?? ($config['temp_folder'] ?? 'temp'));
         if (empty($folder)) $folder = $config['temp_folder'] ?? 'temp';
-
-        // Directory traversal 방어
-        $folder = preg_replace('#\.\.+#', '', $folder);
-        $folder = trim($folder, '/');
 
         $uploadDir = $storagePath . '/' . $folder . '/';
         $uploadUrl = $baseUploadUrl . $folder . '/';
