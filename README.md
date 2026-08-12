@@ -197,8 +197,17 @@ editor.setOgFetchHandler(async (url) => {
 MubloEditorFileImport.setConvertHandler(async (file) => {
     const fd = new FormData(); fd.append('file', file);
     const res = await fetch('/api/v1/editor/convert', { method: 'POST', body: fd });
-    return (await res.json()).html;
+    const data = await res.json();
+    if (!data.success) {
+        // Error 에 서버의 error 코드를 붙이면 다이얼로그가 로케일 안내 문구로 표시
+        // (PDF_TOOL_MISSING → 설치 안내, EMPTY → 스캔 PDF 안내 등)
+        const e = new Error(data.message); e.code = data.error; throw e;
+    }
+    return data.html;
 });
+// PDF 변환은 서버에 poppler(pdftotext) 필요:
+//   Linux: apt install poppler-utils · macOS: brew install poppler · Windows: choco install poppler
+// DOCX/XLSX 는 PHP ZipArchive 만 있으면 동작 (별도 설치 불필요)
 
 // 스티커 — 팩은 각 프로젝트가 제공
 MubloEditorStickers.setPacks([

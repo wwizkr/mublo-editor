@@ -27,6 +27,10 @@
             mode: '삽입 방식', modeReplace: '기존 내용 교체', modeAppend: '기존 내용 뒤에 추가', modeCursor: '커서 위치에 삽입',
             insert: '에디터에 삽입', converting: '변환 중...', done: '변환 완료',
             unsupported: '지원하지 않는 파일 형식입니다', failed: '변환에 실패했습니다',
+            // 서버 변환 핸들러가 던진 Error 의 .code 별 안내 (convert.php 의 error 코드와 대응)
+            err_PDF_TOOL_MISSING: '서버에 PDF 변환 도구(poppler/pdftotext)가 설치되어 있지 않습니다. 서버 관리자에게 설치를 요청하세요 (Linux: apt install poppler-utils · Windows: choco install poppler)',
+            err_EMPTY: '추출할 텍스트가 없습니다 — 스캔 이미지로 된 PDF 는 지원하지 않습니다 (OCR 필요)',
+            err_STANDALONE_DISABLED: '서버 변환 엔드포인트가 비활성 상태입니다 (config.local.php 의 allow_standalone_handler 참조)',
         },
         en: {
             title: 'Import File',
@@ -34,6 +38,9 @@
             mode: 'Insert mode', modeReplace: 'Replace content', modeAppend: 'Append', modeCursor: 'At cursor',
             insert: 'Insert', converting: 'Converting...', done: 'Converted',
             unsupported: 'Unsupported file type', failed: 'Conversion failed',
+            err_PDF_TOOL_MISSING: 'PDF converter (poppler/pdftotext) is not installed on the server. Ask your server admin to install it (Linux: apt install poppler-utils · Windows: choco install poppler)',
+            err_EMPTY: 'No extractable text — scanned/image-only PDFs are not supported (OCR required)',
+            err_STANDALONE_DISABLED: 'Server convert endpoint is disabled (see allow_standalone_handler in config.local.php)',
         }
     };
     const t = (k) => (STR[MubloEditor.getLocale()] || STR.ko)[k] || k;
@@ -267,7 +274,10 @@
                 preview.style.display = 'block';
             } catch (err) {
                 console.error('[MubloEditorFileImport]', err);
-                status.textContent = t('failed');
+                // 알려진 에러 코드(err.code)는 로케일 안내로, 그 외에는 서버 메시지 원문을 표시
+                const known = err && err.code && t('err_' + err.code) !== 'err_' + err.code ? t('err_' + err.code) : '';
+                const detail = known || (err && err.message && err.message !== t('failed') ? err.message : '');
+                status.textContent = t('failed') + (detail ? ' — ' + detail : '');
                 convertedHtml = null;
                 preview.style.display = 'none';
             }

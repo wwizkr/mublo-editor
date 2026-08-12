@@ -244,17 +244,25 @@ class MubloEditorFileConverter
     // ---------------------------------------------------------
     private static function convertPdf(string $path): array
     {
+        // "명령을 찾을 수 없음" 에러 문구에도 명령 이름이 포함되므로,
+        // 버전 출력 형식("pdftotext version x.y")까지 확인해야 오탐이 없다 (특히 Windows).
         $bin = null;
         foreach (['pdftotext', '/usr/bin/pdftotext', '/usr/local/bin/pdftotext'] as $cand) {
             $check = @shell_exec(escapeshellcmd($cand) . ' -v 2>&1');
-            if ($check !== null && stripos((string)$check, 'pdftotext') !== false) { $bin = $cand; break; }
+            if ($check !== null && preg_match('/pdftotext\s+version\s+[\d.]/i', (string)$check)) { $bin = $cand; break; }
         }
         if ($bin === null) {
-            return ['success' => false, 'error' => 'UNSUPPORTED', 'message' => 'pdftotext not available on this server'];
+            return [
+                'success' => false,
+                'error'   => 'PDF_TOOL_MISSING',
+                'message' => 'pdftotext not installed on this server — install poppler-utils'
+                    . ' (Linux: apt install poppler-utils / macOS: brew install poppler / Windows: choco install poppler)',
+            ];
         }
-        $out = @shell_exec(escapeshellcmd($bin) . ' -layout -enc UTF-8 ' . escapeshellarg($path) . ' - 2>/dev/null');
+        $nullDev = DIRECTORY_SEPARATOR === '\\' ? 'nul' : '/dev/null';
+        $out = @shell_exec(escapeshellcmd($bin) . ' -layout -enc UTF-8 ' . escapeshellarg($path) . ' - 2>' . $nullDev);
         if (!$out || trim($out) === '') {
-            return ['success' => false, 'error' => 'EMPTY', 'message' => 'No extractable text'];
+            return ['success' => false, 'error' => 'EMPTY', 'message' => 'No extractable text (scanned/image-only PDF?)'];
         }
         $paras = preg_split('/\R\R+/', trim($out));
         $html = implode('', array_map(
