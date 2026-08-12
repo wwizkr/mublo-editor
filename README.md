@@ -157,6 +157,43 @@ editor.setOgFetchHandler(async (url) => {
 캐시를 포함한다. 운영 환경에서는 프레임워크 라우트에서
 `MubloEditorOgProxy::fetch($url)`를 호출하는 방식을 권장한다.
 
+## 공식 플러그인 (v1.6)
+
+`plugins/` 의 플러그인 파일을 MubloEditor.js 다음에 로드하고,
+`data-toolbar-items` 에 버튼 이름을 추가하면 사용할 수 있다.
+
+| 플러그인 | 버튼 이름 | 기능 |
+|---|---|---|
+| `MubloEditorLayouts.js` | `layout` | 이미지+텍스트 레이아웃 7종 (좌/우/상/하/캡션/오버레이) |
+| `MubloEditorFileImport.js` | `fileimport` | TXT·MD·HTML·CSV 가져오기 + 삽입 방식 3택 |
+| `MubloEditorExport.js` | `export` | Word(.doc) 항상 / PDF(html2pdf.js 로드 시) |
+| `MubloEditorStickers.js` | `sticker` | 스티커 팩 뷰어 + 최근 사용(localStorage) |
+
+```html
+<script src="MubloEditor.js"></script>
+<script src="plugins/MubloEditorLayouts.js"></script>
+
+<textarea class="mublo-editor"
+          data-toolbar-items="bold,italic,separator,layout,fileimport,export,sticker"></textarea>
+```
+
+플러그인별 설정:
+
+```javascript
+// 파일 가져오기 — DOCX/XLSX/PDF 는 서버 변환 핸들러 등록 시 활성화
+MubloEditorFileImport.setConvertHandler(async (file) => {
+    const fd = new FormData(); fd.append('file', file);
+    const res = await fetch('/api/v1/editor/convert', { method: 'POST', body: fd });
+    return (await res.json()).html;
+});
+
+// 스티커 — 팩은 각 프로젝트가 제공
+MubloEditorStickers.setPacks([
+    { name: '팩이름', baseUrl: '/assets/stickers/pack1/',
+      items: [{ file: 'a.png', label: '기분 최고!' }] }
+]);
+```
+
 ## 플러그인 확장 API (v1.4)
 
 플러그인이 툴바 버튼·모달·콘텐츠 삽입을 사용할 수 있다.

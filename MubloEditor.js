@@ -104,7 +104,7 @@
 const MubloEditor = (() => {
     'use strict';
 
-    const VERSION = '1.5.0';
+    const VERSION = '1.6.0';
     const EDITOR_CLASS = 'mublo-editor';
     const EDITOR_WRAPPER_CLASS = 'mublo-editor-wrapper';
     const EDITOR_TOOLBAR_CLASS = 'mublo-editor-toolbar';

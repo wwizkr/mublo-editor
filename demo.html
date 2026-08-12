@@ -105,6 +105,22 @@
                   data-placeholder="커스텀 버튼(시계 아이콘)을 눌러보세요..."></textarea>
     </div>
 
+    <!-- 0-3. 공식 플러그인 4종 (v1.6) -->
+    <div class="demo-section">
+        <h3>0-3. 공식 플러그인 4종 (v1.6)</h3>
+        <p class="text-muted">
+            <strong>레이아웃</strong>(이미지+텍스트 배치) · <strong>파일 불러오기</strong>(TXT/MD/HTML/CSV — DOCX 등은 서버 핸들러 등록 시) ·
+            <strong>내보내기</strong>(Word 항상 / PDF 는 html2pdf.js 로드 시) · <strong>이모티콘</strong>(데모 팩 등록됨).
+            각 버튼은 <code>data-toolbar-items</code>로 노출.
+        </p>
+
+        <textarea class="mublo-editor"
+                  id="editor03"
+                  data-height="240"
+                  data-toolbar-items="undo,redo,separator,bold,italic,separator,image,table,blockquote,separator,layout,fileimport,export,sticker"
+                  data-placeholder="레이아웃/가져오기/내보내기/이모티콘 버튼을 테스트하세요..."><p>내보내기 테스트용 <strong>샘플 콘텐츠</strong>입니다.</p></textarea>
+    </div>
+
     <!-- 1. 기본 에디터 (선언적 사용) -->
     <div class="demo-section">
         <h3>1. 기본 에디터 (선언적 사용)</h3>
@@ -252,6 +268,11 @@ print("hello from python")
 
     <!-- MubloEditor 로드 -->
     <script src="MubloEditor.js"></script>
+    <!-- v1.6 공식 플러그인 -->
+    <script src="plugins/MubloEditorLayouts.js"></script>
+    <script src="plugins/MubloEditorFileImport.js"></script>
+    <script src="plugins/MubloEditorExport.js"></script>
+    <script src="plugins/MubloEditorStickers.js"></script>
 
     <script>
         // 2. 자동 저장 에디터 (JavaScript로 생성)
@@ -480,6 +501,25 @@ print("hello from python")
                 });
             }
         });
+
+        // 0-3. 스티커 데모 팩 (인라인 SVG 데이터 URI — 실제로는 프로젝트 에셋 경로 사용)
+        function demoSticker(emoji, bg) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><circle cx="48" cy="48" r="44" fill="${bg}"/><text x="48" y="60" font-size="40" text-anchor="middle">${emoji}</text></svg>`;
+            return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+        }
+        MubloEditorStickers.setPacks([
+            {
+                name: '데모봇',
+                items: [
+                    { src: demoSticker('😀', '#ffe066'), label: '기분 최고!' },
+                    { src: demoSticker('👍', '#a5d8ff'), label: '좋아요' },
+                    { src: demoSticker('🎉', '#ffc9c9'), label: '축하해요' },
+                    { src: demoSticker('🔥', '#ffd8a8'), label: '불타오르네' },
+                    { src: demoSticker('😴', '#d0bfff'), label: '졸려요' },
+                    { src: demoSticker('💪', '#b2f2bb'), label: '파이팅' }
+                ]
+            }
+        ]);
 
         // 데모 제목에 버전 표시
         document.getElementById('demo-version').textContent = 'v' + MubloEditor.VERSION;
