@@ -4,6 +4,8 @@
 원본은 `mublo-public/public/assets/lib/editor/mublo-editor` 이며, 이 저장소에서
 고도화 작업 후 각 프로젝트로 배포한다.
 
+**고도화 로드맵: `docs/UPGRADE-PLAN.md`** (v1.4~v1.6, 코어/플러그인 구분과 구현 순서 정의)
+
 ## 구조
 
 - `MubloEditor.js` — 에디터 본체 (단일 파일, ~4,100줄)
