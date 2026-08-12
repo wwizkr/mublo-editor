@@ -509,6 +509,16 @@ print("hello from python")
 
         // 0-3. 스티커 팩은 plugins/stickers/packs.js 에서 등록됨 (머블로봇 + Twemoji)
 
+        // 0-3. 파일 불러오기 — DOCX/XLSX/PDF 서버 변환 핸들러 (PHP 서버 필요)
+        MubloEditorFileImport.setConvertHandler(async (file) => {
+            const fd = new FormData();
+            fd.append('file', file, file.name);
+            const res = await fetch('plugins/import/convert.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message || 'convert failed');
+            return data.html;
+        });
+
         // 데모 제목에 버전 표시
         document.getElementById('demo-version').textContent = 'v' + MubloEditor.VERSION;
 
