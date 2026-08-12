@@ -67,9 +67,25 @@ interface MubloEditorStatic {
     registerPlugin(name: string, fn: PluginFunction): boolean;
 
     /**
+     * 전역 커스텀 툴바 항목 등록 (v1.4)
+     * data-toolbar-items 에 name 을 포함하면 버튼이 노출된다.
+     */
+    addToolbarItem(name: string, def: CustomToolbarButton): boolean;
+
+    /**
      * 모든 에디터 동기화
      */
     syncAll(): void;
+}
+
+/** 플러그인이 등록하는 커스텀 툴바 버튼 정의 (v1.4) */
+interface CustomToolbarButton {
+    /** 버튼 아이콘 (인라인 SVG 또는 HTML) */
+    icon: string;
+    /** 버튼 툴팁 */
+    title?: string;
+    /** 클릭 핸들러 */
+    onClick: (editor: Editor) => void;
 }
 
 interface Editor {
@@ -153,6 +169,41 @@ interface Editor {
      * 이미지 업로드 핸들러 반환
      */
     getImageUploadHandler(): ImageUploadHandler | null;
+
+    /**
+     * 이 인스턴스에만 커스텀 툴바 버튼 등록 (v1.4)
+     * toolbarItems 에 name 이 포함되어 있으면 즉시 툴바를 다시 그린다.
+     */
+    registerToolbarButton(name: string, def: CustomToolbarButton): this;
+
+    /**
+     * 에디터 표준 모달 열기 (v1.4)
+     * @param onPrimary false 를 반환하면 모달이 닫히지 않는다
+     * @returns 모달 루트 요소
+     */
+    openModal(
+        title: string,
+        bodyHtml: string,
+        primaryText?: string | null,
+        onPrimary?: ((modal: HTMLElement) => boolean | void) | null
+    ): HTMLElement;
+
+    /**
+     * 커서 위치에 HTML 삽입 (v1.4). 기본 sanitize 적용.
+     */
+    insertHTML(html: string, options?: { sanitize?: boolean }): this;
+
+    /** 현재(또는 저장된) 선택 영역의 텍스트 (v1.4) */
+    getSelectedText(): string;
+
+    /** 선택 영역을 HTML 로 교체 (v1.4, sanitize 적용) */
+    replaceSelection(html: string): this;
+
+    /** 선택 영역 저장 — 모달을 띄우기 전에 호출 (v1.4) */
+    saveSelection(): this;
+
+    /** 저장된 선택 영역 복원 (v1.4) */
+    restoreSelection(): this;
 
     /**
      * 이벤트 리스너 등록

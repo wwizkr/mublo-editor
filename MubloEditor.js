@@ -68,6 +68,7 @@
  * MubloEditor.getAll()                   - 모든 에디터 인스턴스
  * MubloEditor.destroy(id)                - 에디터 제거
  * MubloEditor.registerPlugin(name, fn)   - 플러그인 등록
+ * MubloEditor.addToolbarItem(name, def)  - 전역 커스텀 툴바 항목 등록 (v1.4)
  *
  * [인스턴스 메서드]
  * editor.getHTML()                      - HTML 콘텐츠 반환
@@ -85,6 +86,17 @@
  * editor.on(event, callback)            - 이벤트 리스너 등록
  * editor.off(event, callback)           - 이벤트 리스너 제거
  * editor.fire(event, data)              - 이벤트 발생
+ *
+ * [플러그인 확장 API (v1.4)]
+ * editor.registerToolbarButton(name, {icon, title, onClick})
+ *                                       - 인스턴스 커스텀 툴바 버튼 등록
+ * editor.openModal(title, body, btnText, onPrimary)
+ *                                       - 에디터 표준 모달 열기
+ * editor.insertHTML(html, {sanitize})   - 커서 위치 HTML 삽입
+ * editor.getSelectedText()              - 선택 영역 텍스트
+ * editor.replaceSelection(html)         - 선택 영역 교체
+ * editor.saveSelection() / restoreSelection()
+ *                                       - 모달 전후 선택 영역 저장/복원
  *
  * ============================================================
  */
@@ -173,6 +185,21 @@ const MubloEditor = (() => {
             tableMerge: '셀 병합', tableSplit: '셀 분할', tableDelete: '테이블 삭제',
             // 코드 블록
             codeLanguage: '언어', codeBlockInsert: '코드 블록',
+            // 인용구 갤러리
+            quoteGallery: '인용구 스타일', quoteSample: '인용문 텍스트',
+            quoteTabBasic: '기본', quoteTabColor: '컬러', quoteTabIcon: '아이콘',
+            quoteTabAlert: '알림박스', quoteTabSpecial: '특수',
+            quoteGalleryHint: '스타일 클릭 시 즉시 삽입 · 선택된 텍스트가 있으면 감쌉니다',
+            // 테이블 스타일
+            tableStyle: '테이블 스타일', tableStyleSpacing: '테이블 간격',
+            tableCellPadding: '셀 패딩', tableCellSpacing: '셀 간격', tableWidth: '테이블 너비',
+            tableBorderSection: '테두리 스타일', tableBorderWidth: '테두리 굵기',
+            tableBorderColor: '테두리 색상', tableBorderStyle: '테두리 스타일',
+            borderSolid: '실선', borderDashed: '파선', borderDotted: '점선',
+            borderDouble: '이중선', borderNone: '없음',
+            tableCellBg: '셀 배경색', tableBgClear: '지우기', tableRecentColors: '최근 사용',
+            tableStyleHint: '간격/테두리는 테이블 전체, 배경색은 선택한 셀에 적용됩니다.',
+            apply: '적용',
         },
         en: {
             bold: 'Bold (Ctrl+B)', italic: 'Italic (Ctrl+I)', underline: 'Underline (Ctrl+U)',
@@ -232,6 +259,21 @@ const MubloEditor = (() => {
             tableMerge: 'Merge cells', tableSplit: 'Split cell', tableDelete: 'Delete table',
             // Code block
             codeLanguage: 'Language', codeBlockInsert: 'Code block',
+            // Quote gallery
+            quoteGallery: 'Quote Styles', quoteSample: 'Quotation text',
+            quoteTabBasic: 'Basic', quoteTabColor: 'Color', quoteTabIcon: 'Icon',
+            quoteTabAlert: 'Alert Box', quoteTabSpecial: 'Special',
+            quoteGalleryHint: 'Click a style to insert · wraps selected text if any',
+            // Table style
+            tableStyle: 'Table Style', tableStyleSpacing: 'Table Spacing',
+            tableCellPadding: 'Cell padding', tableCellSpacing: 'Cell spacing', tableWidth: 'Table width',
+            tableBorderSection: 'Border Style', tableBorderWidth: 'Border width',
+            tableBorderColor: 'Border color', tableBorderStyle: 'Border style',
+            borderSolid: 'Solid', borderDashed: 'Dashed', borderDotted: 'Dotted',
+            borderDouble: 'Double', borderNone: 'None',
+            tableCellBg: 'Cell Background', tableBgClear: 'Clear', tableRecentColors: 'Recent',
+            tableStyleHint: 'Spacing/border apply to the whole table, background to selected cells.',
+            apply: 'Apply',
         }
     };
 
@@ -352,7 +394,7 @@ const MubloEditor = (() => {
             table: { icon: TOOLBAR_ICONS.table, title: _t('table'), type: 'table' },
             hr: { icon: TOOLBAR_ICONS.hr, title: _t('hr'), command: 'insertHorizontalRule' },
             video: { icon: TOOLBAR_ICONS.video, title: _t('video'), type: 'video' },
-            blockquote: { icon: TOOLBAR_ICONS.blockquote, title: _t('blockquote'), command: 'formatBlock', value: 'blockquote' },
+            blockquote: { icon: TOOLBAR_ICONS.blockquote, title: _t('blockquote'), type: 'quotegallery' },
             code: { icon: TOOLBAR_ICONS.code, title: _t('code'), type: 'codeblock' },
             removeformat: { icon: TOOLBAR_ICONS.removeformat, title: _t('removeformat'), command: 'removeFormat' },
             selectall: { icon: TOOLBAR_ICONS.selectall, title: _t('selectall'), command: 'selectAll' },
@@ -383,8 +425,98 @@ const MubloEditor = (() => {
     // 코드 블록 언어 목록 (data-language 속성 저장 + 구문 강조 대상)
     const CODE_LANGUAGES = ['text', 'html', 'css', 'javascript', 'php', 'sql', 'python', 'json', 'bash'];
 
+    // =========================================================
+    // 인용구 스타일 갤러리 데이터
+    // - style: blockquote 인라인 스타일 (뷰 페이지에서 CSS 없이 렌더링되도록 완결)
+    // - icon: 내용 앞에 붙는 이모지/문자 (없으면 생략)
+    // - label: 갤러리 카드 라벨 (ko/en)
+    // =========================================================
+    const QUOTE_STYLES = {
+        basic: [
+            { id: 'classic-line', label: { ko: '클래식 라인', en: 'Classic line' },
+              style: 'margin:1em 0;padding:.6em 1em;border-left:4px solid #adb5bd;color:#495057;' },
+            { id: 'simple-bg', label: { ko: '심플 배경', en: 'Simple background' },
+              style: 'margin:1em 0;padding:.8em 1em;background:#f1f3f5;border-radius:4px;color:#495057;' },
+            { id: 'double-line', label: { ko: '더블 라인', en: 'Double line' },
+              style: 'margin:1em 0;padding:.6em 1em;border-left:4px double #495057;border-right:4px double #495057;color:#495057;' },
+            { id: 'top-bottom', label: { ko: '상하 라인', en: 'Top & bottom' },
+              style: 'margin:1em 0;padding:.8em .5em;border-top:2px solid #343a40;border-bottom:2px solid #343a40;color:#343a40;' },
+            { id: 'thick-left', label: { ko: '왼쪽 굵은 라인', en: 'Thick left' },
+              style: 'margin:1em 0;padding:.6em 1em;border-left:8px solid #343a40;background:#f8f9fa;color:#343a40;' },
+            { id: 'italic-accent', label: { ko: '이탤릭 강조', en: 'Italic accent' },
+              style: 'margin:1em 0;padding:.6em 1em;border-left:3px solid #7048e8;color:#7048e8;font-style:italic;' },
+            { id: 'dashed-left', label: { ko: '점선 왼쪽', en: 'Dashed left' },
+              style: 'margin:1em 0;padding:.6em 1em;border-left:3px dashed #868e96;color:#495057;' },
+            { id: 'gradient-line', label: { ko: '그라데이션 라인', en: 'Gradient line' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #7048e8;background:linear-gradient(90deg,#f3f0ff,#ffffff);color:#5f3dc4;' },
+            { id: 'round-box', label: { ko: '둥근 박스', en: 'Rounded box' },
+              style: 'margin:1em 0;padding:.8em 1.2em;border:1px solid #dee2e6;border-radius:12px;color:#495057;' },
+            { id: 'dashed-box', label: { ko: '점선 박스', en: 'Dashed box' },
+              style: 'margin:1em 0;padding:.8em 1.2em;border:2px dashed #adb5bd;border-radius:8px;color:#495057;' }
+        ],
+        color: [
+            { id: 'blue', label: { ko: '블루', en: 'Blue' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #339af0;background:#e7f5ff;color:#1971c2;border-radius:0 4px 4px 0;' },
+            { id: 'green', label: { ko: '그린', en: 'Green' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #51cf66;background:#ebfbee;color:#2b8a3e;border-radius:0 4px 4px 0;' },
+            { id: 'red', label: { ko: '레드', en: 'Red' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #ff6b6b;background:#fff5f5;color:#c92a2a;border-radius:0 4px 4px 0;' },
+            { id: 'orange', label: { ko: '오렌지', en: 'Orange' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #ff922b;background:#fff4e6;color:#d9480f;border-radius:0 4px 4px 0;' },
+            { id: 'purple', label: { ko: '퍼플', en: 'Purple' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #9775fa;background:#f3f0ff;color:#6741d9;border-radius:0 4px 4px 0;' },
+            { id: 'teal', label: { ko: '틸', en: 'Teal' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #20c997;background:#e6fcf5;color:#087f5b;border-radius:0 4px 4px 0;' },
+            { id: 'pink', label: { ko: '핑크', en: 'Pink' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #f06595;background:#fff0f6;color:#c2255c;border-radius:0 4px 4px 0;' },
+            { id: 'dark', label: { ko: '다크', en: 'Dark' },
+              style: 'margin:1em 0;padding:.8em 1em;background:#343a40;color:#f1f3f5;border-radius:6px;' }
+        ],
+        icon: [
+            { id: 'idea', icon: '💡', label: { ko: '아이디어', en: 'Idea' },
+              style: 'margin:1em 0;padding:.8em 1em;background:#fff9db;border-radius:6px;color:#5c5028;' },
+            { id: 'pin', icon: '📌', label: { ko: '핀 고정', en: 'Pinned' },
+              style: 'margin:1em 0;padding:.8em 1em;border:1px solid #ffc9c9;background:#fff5f5;border-radius:6px;color:#495057;' },
+            { id: 'star', icon: '⭐', label: { ko: '별점 강조', en: 'Star' },
+              style: 'margin:1em 0;padding:.8em 1em;border:1px solid #ffe066;background:#fff9db;border-radius:6px;color:#495057;' },
+            { id: 'memo', icon: '📝', label: { ko: '메모', en: 'Memo' },
+              style: 'margin:1em 0;padding:.8em 1em;border-left:4px solid #74c0fc;background:#f8f9fa;color:#495057;' },
+            { id: 'quote-mark', icon: '❝', label: { ko: '인용 부호', en: 'Quote mark' },
+              style: 'margin:1em 0;padding:.8em 1em;background:#f8f9fa;border-radius:6px;color:#495057;font-style:italic;' }
+        ],
+        alert: [
+            { id: 'info', icon: 'ℹ️', label: { ko: '정보', en: 'Info' },
+              style: 'margin:1em 0;padding:.8em 1em;border:1px solid #a5d8ff;background:#e7f5ff;border-radius:6px;color:#1864ab;' },
+            { id: 'success', icon: '✅', label: { ko: '성공', en: 'Success' },
+              style: 'margin:1em 0;padding:.8em 1em;border:1px solid #b2f2bb;background:#ebfbee;border-radius:6px;color:#2b8a3e;' },
+            { id: 'warning', icon: '⚠️', label: { ko: '주의', en: 'Warning' },
+              style: 'margin:1em 0;padding:.8em 1em;border:1px solid #ffec99;background:#fff9db;border-radius:6px;color:#e67700;' },
+            { id: 'danger', icon: '🚫', label: { ko: '위험', en: 'Danger' },
+              style: 'margin:1em 0;padding:.8em 1em;border:1px solid #ffc9c9;background:#fff5f5;border-radius:6px;color:#c92a2a;' },
+            { id: 'note', icon: '🗒️', label: { ko: '노트', en: 'Note' },
+              style: 'margin:1em 0;padding:.8em 1em;border:1px solid #d0bfff;background:#f3f0ff;border-radius:6px;color:#5f3dc4;' },
+            { id: 'tip', icon: '💬', label: { ko: '팁', en: 'Tip' },
+              style: 'margin:1em 0;padding:.8em 1em;border:1px solid #96f2d7;background:#e6fcf5;border-radius:6px;color:#087f5b;' }
+        ],
+        special: [
+            { id: 'big-quote', label: { ko: '큰 따옴표', en: 'Big quotes' },
+              style: 'margin:1.2em 0;padding:1em 1.2em .8em;background:#f8f9fa;border-radius:8px;color:#495057;position:relative;font-size:1.05em;',
+              icon: '❝', iconStyle: 'font-size:1.6em;color:#adb5bd;line-height:1;vertical-align:-0.2em;' },
+            { id: 'gradient-bg', label: { ko: '그라데이션 배경', en: 'Gradient background' },
+              style: 'margin:1em 0;padding:1em 1.2em;background:linear-gradient(135deg,#e7f5ff,#f3f0ff);border-radius:10px;color:#3b5bdb;' },
+            { id: 'shadow-card', label: { ko: '섀도 카드', en: 'Shadow card' },
+              style: 'margin:1em 0;padding:1em 1.2em;background:#ffffff;border:1px solid #e9ecef;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.08);color:#495057;' },
+            { id: 'center-quote', label: { ko: '가운데 정렬', en: 'Centered' },
+              style: 'margin:1.2em 0;padding:.8em 1em;text-align:center;border-top:1px solid #dee2e6;border-bottom:1px solid #dee2e6;color:#495057;font-style:italic;' },
+            { id: 'dark-terminal', label: { ko: '터미널', en: 'Terminal' },
+              style: 'margin:1em 0;padding:.8em 1em;background:#212529;color:#69db7c;border-radius:6px;font-family:monospace;' }
+        ]
+    };
+
     const instances = new Map();
     const plugins = new Map();
+    // 플러그인이 등록하는 전역 커스텀 툴바 항목 (이름 → def)
+    const customToolbarItems = new Map();
 
     // =========================================================
     // BlobInfo 클래스
@@ -608,6 +740,15 @@ const MubloEditor = (() => {
         return out;
     }
 
+    /** rgb(a) 문자열을 #hex 로 변환. 파싱 불가하면 '' */
+    function rgbToHex(rgb) {
+        if (!rgb || rgb === 'transparent' || rgb === 'rgba(0, 0, 0, 0)') return '';
+        if (rgb.startsWith('#')) return rgb;
+        const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb);
+        if (!m) return '';
+        return '#' + [m[1], m[2], m[3]].map(n => (+n).toString(16).padStart(2, '0')).join('');
+    }
+
     function sanitizeHtml(html) {
         if (!html) return '';
 
@@ -716,6 +857,11 @@ const MubloEditor = (() => {
 
             // data-toolbar-*-mobile 옵션이 있을 때만 생성하는 반응형 툴바 쿼리
             this._toolbarMedia = null;
+
+            // 인스턴스 전용 커스텀 툴바 항목 (registerToolbarButton)
+            this._customToolbarItems = new Map();
+            // 테이블 스타일 다이얼로그 최근 사용 색상
+            this._recentTableColors = [];
 
             this._withLocale(() => this._build());
             this._withLocale(() => this._bindEvents());
@@ -846,6 +992,57 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
+        // 플러그인 확장 API (v1.4+)
+        // =========================================================
+
+        /**
+         * 이 인스턴스에만 커스텀 툴바 버튼 등록.
+         * def: { icon: '<svg…>', title: '툴팁', onClick: (editor) => {} }
+         * 버튼 노출은 toolbarItems(data-toolbar-items)에 name을 포함해야 한다.
+         */
+        registerToolbarButton(name, def) {
+            if (!name || typeof def?.onClick !== 'function') {
+                console.error('[MubloEditor] registerToolbarButton: name과 onClick이 필요합니다');
+                return this;
+            }
+            this._customToolbarItems.set(name, def);
+            // 이미 툴바에 노출 대상이면 다시 그린다
+            if (this._resolveToolbarItems().includes(name)) this._renderResponsiveToolbar();
+            return this;
+        }
+
+        /**
+         * 에디터 표준 모달 열기 (플러그인용 공개 래핑).
+         * onPrimary(modal)가 false를 반환하면 닫히지 않는다.
+         */
+        openModal(title, bodyHtml, primaryText = null, onPrimary = null) {
+            return this._withLocale(() => this._createModal(title, bodyHtml, primaryText, onPrimary));
+        }
+
+        /** 커서 위치에 HTML 삽입. 기본 sanitize 적용, { sanitize:false }로 해제(신뢰 소스 전용). */
+        insertHTML(html, { sanitize = true } = {}) {
+            return sanitize ? this.insertContent(html) : this.insertTrustedContent(html);
+        }
+
+        /** 현재(또는 저장된) 선택 영역의 텍스트 */
+        getSelectedText() {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && this.contentArea.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+                return sel.toString();
+            }
+            return this.savedRange ? this.savedRange.toString() : '';
+        }
+
+        /** 선택 영역을 HTML로 교체 (sanitize 적용) */
+        replaceSelection(html) {
+            return this.insertContent(html);
+        }
+
+        /** 선택 영역 저장/복원 — 모달을 띄우기 전/후에 사용 */
+        saveSelection() { this._saveSelection(); return this; }
+        restoreSelection() { this._restoreSelection(); return this; }
+
+        // =========================================================
         // 빌드
         // =========================================================
         _build() {
@@ -938,7 +1135,10 @@ const MubloEditor = (() => {
                     toolbar.appendChild(sep);
                     return;
                 }
-                const def = _getToolbarItems()[name];
+                // 조회 우선순위: 인스턴스 커스텀 → 전역 커스텀(플러그인) → 내장
+                const def = this._customToolbarItems.get(name)
+                    || customToolbarItems.get(name)
+                    || _getToolbarItems()[name];
                 if (!def) return;
                 const btn = this._createButton(name, def);
                 if (btn) toolbar.appendChild(btn);
@@ -1206,7 +1406,14 @@ const MubloEditor = (() => {
 
         _handleCommand(name, def) {
             this.contentArea.focus();
+            // 플러그인 버튼: onClick(editor) 형태
+            if (typeof def.onClick === 'function') {
+                this._saveSelection();
+                this._withLocale(() => def.onClick(this));
+                return;
+            }
             this._withLocale(() => { switch (def.type) {
+                case 'quotegallery': this._openQuoteGallery(); break;
                 case 'link': this._insertLink(); break;
                 case 'image': this._openImageDialog(); break;
                 case 'video': this._insertVideo(); break;
@@ -3203,6 +3410,110 @@ const MubloEditor = (() => {
         }
 
         // =========================================================
+        // 인용구 스타일 갤러리
+        // =========================================================
+        _getClosestBlockquote() {
+            const sel = window.getSelection();
+            let node = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).commonAncestorContainer
+                : this.savedRange?.commonAncestorContainer;
+            while (node && node !== this.contentArea) {
+                if (node.nodeType === 1 && node.tagName === 'BLOCKQUOTE') return node;
+                node = node.parentNode;
+            }
+            return null;
+        }
+
+        _quoteIconHtml(def) {
+            if (!def.icon) return '';
+            const extra = def.iconStyle ? escapeHtml(def.iconStyle) : '';
+            return `<span data-quote-icon contenteditable="false" style="margin-right:.5em;${extra}">${def.icon}</span>`;
+        }
+
+        _openQuoteGallery() {
+            this._saveSelection();
+            const tabs = [
+                { key: 'basic', label: _t('quoteTabBasic') },
+                { key: 'color', label: _t('quoteTabColor') },
+                { key: 'icon', label: _t('quoteTabIcon') },
+                { key: 'alert', label: _t('quoteTabAlert') },
+                { key: 'special', label: _t('quoteTabSpecial') }
+            ];
+            const sample = escapeHtml(_t('quoteSample'));
+            const loc = (this._locale || _globalLocale) === 'en' ? 'en' : 'ko';
+
+            const tabsHtml = tabs.map((t, i) =>
+                `<button type="button" class="mublo-editor-quote-tab${i === 0 ? ' active' : ''}" data-tab="${t.key}">${t.label}</button>`
+            ).join('');
+
+            const gridsHtml = tabs.map((t, i) => {
+                const cards = QUOTE_STYLES[t.key].map(s =>
+                    `<button type="button" class="mublo-editor-quote-card" data-cat="${t.key}" data-id="${s.id}">
+                        <blockquote style="${escapeHtml(s.style)}">${this._quoteIconHtml(s)}${sample}</blockquote>
+                        <span class="mublo-editor-quote-card-label">${escapeHtml(s.label[loc])}</span>
+                    </button>`
+                ).join('');
+                return `<div class="mublo-editor-quote-grid" data-tab="${t.key}"${i === 0 ? '' : ' style="display:none"'}>${cards}</div>`;
+            }).join('');
+
+            const body = `
+                <div class="mublo-editor-quote-tabs">${tabsHtml}</div>
+                ${gridsHtml}
+                <div class="mublo-editor-quote-hint">${_t('quoteGalleryHint')}</div>
+            `;
+
+            const modal = this._createModal(_t('quoteGallery'), body);
+            modal.querySelector('.mublo-editor-modal-dialog').classList.add('mublo-editor-modal-wide');
+            // 즉시 삽입 방식 — 확인 버튼 숨기고 취소는 닫기로
+            modal.querySelector('#mublo-editor-modal-confirm').style.display = 'none';
+            modal.querySelector('#mublo-editor-modal-cancel').textContent = _t('findClose');
+
+            modal.querySelectorAll('.mublo-editor-quote-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    modal.querySelectorAll('.mublo-editor-quote-tab').forEach(t => t.classList.toggle('active', t === tab));
+                    modal.querySelectorAll('.mublo-editor-quote-grid').forEach(g => {
+                        g.style.display = g.dataset.tab === tab.dataset.tab ? '' : 'none';
+                    });
+                });
+            });
+
+            modal.querySelectorAll('.mublo-editor-quote-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const def = (QUOTE_STYLES[card.dataset.cat] || []).find(s => s.id === card.dataset.id);
+                    if (def) this._withLocale(() => this._applyQuoteStyle(def));
+                    modal.querySelector('#mublo-editor-modal-cancel').click();
+                });
+            });
+        }
+
+        _applyQuoteStyle(def) {
+            const existing = this._getClosestBlockquote();
+            const iconHtml = this._quoteIconHtml(def);
+
+            if (existing) {
+                // 커서가 이미 인용구 안 → 스타일 교체
+                existing.style.cssText = def.style;
+                existing.setAttribute('data-quote-style', def.id);
+                const oldIcon = existing.querySelector('[data-quote-icon]');
+                if (oldIcon) oldIcon.remove();
+                if (iconHtml) existing.insertAdjacentHTML('afterbegin', iconHtml);
+                this._onChange();
+                return;
+            }
+
+            this._restoreSelection();
+            const sel = window.getSelection();
+            let content = '';
+            if (sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
+                && this.contentArea.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+                content = escapeHtml(sel.toString());
+            }
+            if (!content) content = escapeHtml(_t('quoteSample'));
+
+            const html = `<blockquote data-quote-style="${def.id}" style="${escapeHtml(def.style)}">${iconHtml}${content}</blockquote><p><br></p>`;
+            this._exec('insertHTML', html);
+        }
+
+        // =========================================================
         // 테이블 셀 편집 (컨텍스트 메뉴 · 행열 추가/삭제 · 병합/분할)
         // =========================================================
         _initTableEditing() {
@@ -3249,6 +3560,9 @@ const MubloEditor = (() => {
             document.addEventListener('mouseup', this._handlers.docMouseup);
             document.addEventListener('mousedown', this._handlers.docCloseTableMenu);
             document.addEventListener('scroll', this._handlers.docScrollCloseMenu, true);
+
+            // 열 경계 드래그 리사이즈
+            this._initTableColumnResize();
         }
 
         /** 표를 그리드(2차원 셀 참조 맵)로 전개 — colspan/rowspan 반영 */
@@ -3343,6 +3657,7 @@ const MubloEditor = (() => {
                 { label: _t('tableMerge'), fn: () => this._mergeCells(), disabled: !canMerge },
                 { label: _t('tableSplit'), fn: () => this._splitCell(cell), disabled: !canSplit },
                 { sep: true },
+                { label: _t('tableStyle'), fn: () => this._withLocale(() => this._openTableStyleDialog(cell)) },
                 { label: _t('tableDelete'), fn: () => this._deleteTable(cell), danger: true },
             ];
 
@@ -3560,6 +3875,249 @@ const MubloEditor = (() => {
             }
             this._clearCellSelection();
             this._onChange();
+        }
+
+        // =========================================================
+        // 테이블 스타일 다이얼로그 (v1.4)
+        // =========================================================
+        _openTableStyleDialog(cell) {
+            const table = cell.closest('table');
+            if (!table) return;
+            this._saveSelection();
+
+            // 배경색 적용 대상: 드래그로 선택한 셀들, 없으면 우클릭한 셀
+            const targetCells = this._getSelectedCells();
+            const bgCells = targetCells.length ? targetCells : [cell];
+
+            // 현재 값 읽기
+            const probe = table.querySelector('td, th') || cell;
+            const pcs = getComputedStyle(probe);
+            const curPadding = parseInt(pcs.paddingTop, 10) || 0;
+            const curSpacing = parseInt(table.style.borderSpacing, 10) || 0;
+            const widthMatch = /^(\d+(?:\.\d+)?)%$/.exec(table.style.width || '');
+            const curWidth = widthMatch ? Math.round(parseFloat(widthMatch[1])) : 100;
+            const bwParsed = parseInt(pcs.borderTopWidth, 10);
+            const curBorderW = Number.isFinite(bwParsed) ? bwParsed : 1;
+            const curBorderColor = rgbToHex(pcs.borderTopColor) || '#dee2e6';
+            const knownStyles = ['solid', 'dashed', 'dotted', 'double', 'none'];
+            const curBorderStyle = knownStyles.includes(pcs.borderTopStyle) ? pcs.borderTopStyle : 'solid';
+            const curBg = rgbToHex(cell.style.backgroundColor) || '';
+
+            const styleLabels = {
+                solid: _t('borderSolid'), dashed: _t('borderDashed'), dotted: _t('borderDotted'),
+                double: _t('borderDouble'), none: _t('borderNone')
+            };
+            const paletteHtml = (colors) => colors.map(c =>
+                `<button type="button" class="mublo-editor-color-btn" data-color="${c}" style="background-color:${c}" title="${c}"></button>`
+            ).join('');
+
+            const body = `
+                <div class="mublo-editor-tstyle-section">
+                    <div class="mublo-editor-tstyle-section-title">${_t('tableStyleSpacing')}</div>
+                    <div class="mublo-editor-tstyle-row">
+                        <label>${_t('tableCellPadding')}</label>
+                        <input type="range" id="mublo-ts-padding" min="0" max="24" value="${curPadding}">
+                        <span class="mublo-editor-tstyle-val" id="mublo-ts-padding-val">${curPadding}px</span>
+                    </div>
+                    <div class="mublo-editor-tstyle-row">
+                        <label>${_t('tableCellSpacing')}</label>
+                        <input type="range" id="mublo-ts-spacing" min="0" max="12" value="${curSpacing}">
+                        <span class="mublo-editor-tstyle-val" id="mublo-ts-spacing-val">${curSpacing}px</span>
+                    </div>
+                    <div class="mublo-editor-tstyle-row">
+                        <label>${_t('tableWidth')}</label>
+                        <input type="range" id="mublo-ts-width" min="30" max="100" value="${curWidth}">
+                        <span class="mublo-editor-tstyle-val" id="mublo-ts-width-val">${curWidth}%</span>
+                    </div>
+                </div>
+                <div class="mublo-editor-tstyle-section">
+                    <div class="mublo-editor-tstyle-section-title">${_t('tableBorderSection')}</div>
+                    <div class="mublo-editor-tstyle-row">
+                        <label>${_t('tableBorderWidth')}</label>
+                        <input type="range" id="mublo-ts-bwidth" min="0" max="5" value="${curBorderW}">
+                        <span class="mublo-editor-tstyle-val" id="mublo-ts-bwidth-val">${curBorderW}px</span>
+                    </div>
+                    <div class="mublo-editor-tstyle-row">
+                        <label>${_t('tableBorderColor')}</label>
+                        <input type="color" class="mublo-editor-tstyle-color-swatch" id="mublo-ts-bcolor" value="${curBorderColor}">
+                        <input type="text" id="mublo-ts-bcolor-hex" value="${curBorderColor}" size="9">
+                    </div>
+                    <div class="mublo-editor-tstyle-row">
+                        <label>${_t('tableBorderStyle')}</label>
+                        <select id="mublo-ts-bstyle">
+                            ${knownStyles.map(s => `<option value="${s}"${s === curBorderStyle ? ' selected' : ''}>${styleLabels[s]}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="mublo-editor-tstyle-section">
+                    <div class="mublo-editor-tstyle-section-title">${_t('tableCellBg')}</div>
+                    <div class="mublo-editor-tstyle-row">
+                        <input type="color" class="mublo-editor-tstyle-color-swatch" id="mublo-ts-bg" value="${curBg || '#ffffff'}">
+                        <input type="text" id="mublo-ts-bg-hex" value="${curBg}" size="9" placeholder="#RRGGBB">
+                        <button type="button" class="mublo-editor-modal-btn mublo-editor-modal-btn-secondary" id="mublo-ts-bg-clear">${_t('tableBgClear')}</button>
+                    </div>
+                    <div class="mublo-editor-tstyle-palette" id="mublo-ts-palette">${paletteHtml(this.options.colors)}</div>
+                    ${this._recentTableColors.length ? `
+                    <div class="mublo-editor-tstyle-section-title" style="margin-top:.625rem">${_t('tableRecentColors')}</div>
+                    <div class="mublo-editor-tstyle-palette" id="mublo-ts-recent">${paletteHtml(this._recentTableColors)}</div>` : ''}
+                </div>
+                <div class="mublo-editor-tstyle-hint">${_t('tableStyleHint')}</div>
+            `;
+
+            const modal = this._createModal(_t('tableStyle'), body, _t('apply'), (m) => {
+                const val = id => m.querySelector('#' + id).value;
+                const padding = parseInt(val('mublo-ts-padding'), 10);
+                const spacing = parseInt(val('mublo-ts-spacing'), 10);
+                const width = parseInt(val('mublo-ts-width'), 10);
+                const bw = parseInt(val('mublo-ts-bwidth'), 10);
+                const bstyle = val('mublo-ts-bstyle');
+                const bcolor = val('mublo-ts-bcolor-hex').trim() || val('mublo-ts-bcolor');
+                const bg = val('mublo-ts-bg-hex').trim();
+
+                table.style.width = width + '%';
+                if (spacing > 0) {
+                    table.style.borderCollapse = 'separate';
+                    table.style.borderSpacing = spacing + 'px';
+                } else {
+                    table.style.borderCollapse = 'collapse';
+                    table.style.removeProperty('border-spacing');
+                }
+                table.querySelectorAll('td, th').forEach(c => {
+                    c.style.padding = padding + 'px';
+                    c.style.border = (bstyle === 'none' || bw === 0) ? 'none' : `${bw}px ${bstyle} ${bcolor}`;
+                });
+                bgCells.forEach(c => {
+                    if (bg) c.style.backgroundColor = bg;
+                    else c.style.removeProperty('background-color');
+                });
+                if (bg) {
+                    this._recentTableColors = [bg, ...this._recentTableColors.filter(c => c !== bg)].slice(0, 8);
+                }
+                this._clearCellSelection();
+                this._onChange();
+            });
+
+            // 슬라이더 값 표시
+            [['mublo-ts-padding', 'px'], ['mublo-ts-spacing', 'px'], ['mublo-ts-width', '%'], ['mublo-ts-bwidth', 'px']].forEach(([id, unit]) => {
+                const input = modal.querySelector('#' + id);
+                input.addEventListener('input', () => {
+                    modal.querySelector(`#${id}-val`).textContent = input.value + unit;
+                });
+            });
+            // 색상 피커 ↔ hex 입력 동기화
+            [['mublo-ts-bcolor', 'mublo-ts-bcolor-hex'], ['mublo-ts-bg', 'mublo-ts-bg-hex']].forEach(([picker, hex]) => {
+                const p = modal.querySelector('#' + picker);
+                const h = modal.querySelector('#' + hex);
+                p.addEventListener('input', () => { h.value = p.value; });
+                h.addEventListener('input', () => { if (/^#[0-9a-fA-F]{6}$/.test(h.value.trim())) p.value = h.value.trim(); });
+            });
+            // 팔레트 클릭 → 셀 배경 hex 에 반영
+            modal.querySelectorAll('#mublo-ts-palette .mublo-editor-color-btn, #mublo-ts-recent .mublo-editor-color-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modal.querySelector('#mublo-ts-bg-hex').value = btn.dataset.color;
+                    modal.querySelector('#mublo-ts-bg').value = btn.dataset.color;
+                });
+            });
+            modal.querySelector('#mublo-ts-bg-clear').addEventListener('click', () => {
+                modal.querySelector('#mublo-ts-bg-hex').value = '';
+            });
+        }
+
+        // =========================================================
+        // 테이블 열 리사이즈 (열 경계 드래그, v1.4)
+        // =========================================================
+        _initTableColumnResize() {
+            const EDGE = 5; // 경계 감지 픽셀
+
+            const edgeInfo = (e) => {
+                const cell = e.target.closest && e.target.closest('td, th');
+                if (!cell || !this.contentArea.contains(cell)) return null;
+                const rect = cell.getBoundingClientRect();
+                if (rect.right - e.clientX <= EDGE) return { cell, side: 'right' };
+                if (e.clientX - rect.left <= EDGE) return { cell, side: 'left' };
+                return null;
+            };
+
+            this.contentArea.addEventListener('mousemove', (e) => {
+                if (this._colDrag) return;
+                this.contentArea.style.cursor = edgeInfo(e) ? 'col-resize' : '';
+            });
+
+            // capture 단계에서 처리해 셀 다중선택(mousedown)보다 먼저 가로챈다
+            this.contentArea.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                const info = edgeInfo(e);
+                if (!info) return;
+
+                const table = info.cell.closest('table');
+                if (!table) return;
+                const grid = this._buildTableGrid(table);
+                const coord = this._getCellCoord(grid, info.cell);
+                if (!coord) return;
+
+                // 드래그 대상 경계의 왼쪽 열 인덱스
+                let colIndex = info.side === 'right'
+                    ? coord.c + (info.cell.colSpan || 1) - 1
+                    : coord.c - 1;
+                const colCount = this._tableColumnCount(grid);
+                if (colIndex < 0 || colIndex >= colCount - 1) return; // 표의 양 끝 경계는 제외
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const cg = this._ensureColgroup(table, grid, colCount);
+                const cols = Array.from(cg.children);
+                const tableWidth = table.getBoundingClientRect().width || 1;
+                const startA = parseFloat(cols[colIndex].style.width) || (100 / colCount);
+                const startB = parseFloat(cols[colIndex + 1].style.width) || (100 / colCount);
+                const startX = e.clientX;
+                this._colDrag = true;
+                this.contentArea.classList.add('mublo-editor-col-resizing');
+
+                const onMove = (ev) => {
+                    const deltaPct = (ev.clientX - startX) / tableWidth * 100;
+                    const MIN = 5;
+                    let a = Math.min(Math.max(startA + deltaPct, MIN), startA + startB - MIN);
+                    cols[colIndex].style.width = a.toFixed(2) + '%';
+                    cols[colIndex + 1].style.width = (startA + startB - a).toFixed(2) + '%';
+                };
+                const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    this._colDrag = false;
+                    this.contentArea.classList.remove('mublo-editor-col-resizing');
+                    this.contentArea.style.cursor = '';
+                    this._onChange();
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            }, true);
+        }
+
+        /** colgroup 이 없거나 열 수가 다르면 현재 렌더 폭 기준으로 생성 */
+        _ensureColgroup(table, grid, colCount) {
+            let cg = table.querySelector(':scope > colgroup');
+            if (cg && cg.children.length === colCount) return cg;
+            if (cg) cg.remove();
+
+            cg = document.createElement('colgroup');
+            const tableWidth = table.getBoundingClientRect().width || 1;
+            for (let c = 0; c < colCount; c++) {
+                // 해당 열을 단독 점유하는 셀을 찾아 실제 렌더 폭 사용
+                let w = null;
+                for (let r = 0; r < grid.length; r++) {
+                    const gc = grid[r] && grid[r][c];
+                    if (gc && (gc.colSpan || 1) === 1) { w = gc.getBoundingClientRect().width; break; }
+                }
+                if (w === null) w = tableWidth / colCount;
+                const col = document.createElement('col');
+                col.style.width = (w / tableWidth * 100).toFixed(2) + '%';
+                cg.appendChild(col);
+            }
+            table.insertBefore(cg, table.firstChild);
+            table.style.tableLayout = 'fixed';
+            if (!table.style.width) table.style.width = '100%';
+            return cg;
         }
 
         // =========================================================
@@ -4099,6 +4657,20 @@ const MubloEditor = (() => {
             plugins.set(name, fn);
             // 이미 생성된 에디터에도 적용
             instances.forEach(e => { try { fn(e); } catch (err) { console.error(err); } });
+            return true;
+        },
+
+        /**
+         * 전역 커스텀 툴바 항목 등록 (모든 인스턴스에서 사용 가능).
+         * def: { icon, title, onClick(editor) }
+         * data-toolbar-items에 name을 넣으면 버튼이 노출된다.
+         */
+        addToolbarItem(name, def) {
+            if (!name || typeof def?.onClick !== 'function') return false;
+            customToolbarItems.set(name, def);
+            instances.forEach(e => {
+                if (e._resolveToolbarItems().includes(name)) e._renderResponsiveToolbar();
+            });
             return true;
         },
         

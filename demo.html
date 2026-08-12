@@ -67,7 +67,11 @@
             ① 마크다운 단축키: 빈 줄에서 <code>## </code>, <code>### </code>, <code>- </code>, <code>1. </code>, <code>&gt; </code> 입력 → 자동 변환 ·
             <code>---</code>+Enter → 수평선 · <code>```</code>+Enter → 코드 블록 · <code>**굵게**</code>+Space<br>
             ② 이미지 클릭 → 8방향 리사이즈 핸들 · ③ 테이블 셀 우클릭 → 컨텍스트 메뉴 (드래그로 여러 셀 선택 후 병합) ·
-            ④ 코드 블록 언어 선택 + Tab 들여쓰기 + <strong>정규식 기반 구문 강조</strong>(외부 라이브러리 없음, 입력 시 300ms 디바운스)
+            ④ 코드 블록 언어 선택 + Tab 들여쓰기 + <strong>정규식 기반 구문 강조</strong>(외부 라이브러리 없음, 입력 시 300ms 디바운스)<br>
+            ⑤ <strong>인용구 버튼 → 스타일 갤러리</strong> (5개 탭 · 30여 종 · 선택 텍스트 감싸기 · 인용구 안에서 스타일 교체) ·
+            ⑥ <strong>셀 우클릭 → 테이블 스타일</strong> (패딩/간격/너비/테두리/셀 배경색) ·
+            ⑦ <strong>열 경계 드래그 → 열 너비 조절</strong> ·
+            ⑧ 플러그인 확장 API (아래 0-2 데모)
         </p>
 
         <textarea class="mublo-editor"
@@ -80,6 +84,22 @@
             <button class="btn btn-sm btn-primary" onclick="getHTML('editor0')">HTML 가져오기</button>
         </div>
         <div id="output0" class="output-box" style="display:none;"></div>
+    </div>
+
+    <!-- 0-2. 플러그인 확장 API 데모 -->
+    <div class="demo-section">
+        <h3>0-2. 플러그인 확장 API (v1.4)</h3>
+        <p class="text-muted">
+            <code>MubloEditor.addToolbarItem()</code>으로 등록한 커스텀 버튼(⏰ 타임스탬프)이
+            <code>data-toolbar-items</code>에 포함되어 툴바에 노출된다.
+            버튼 클릭 → <code>openModal()</code> + <code>insertHTML()</code> 조합.
+        </p>
+
+        <textarea class="mublo-editor"
+                  id="editor02"
+                  data-height="180"
+                  data-toolbar-items="undo,redo,separator,bold,italic,separator,blockquote,table,separator,timestamp"
+                  data-placeholder="커스텀 버튼(시계 아이콘)을 눌러보세요..."></textarea>
     </div>
 
     <!-- 1. 기본 에디터 (선언적 사용) -->
@@ -434,6 +454,29 @@ echo 'text';
 print("hello from python")
 [/code]`);
         }
+
+        // 0-2. 플러그인 확장 API 데모 — 전역 커스텀 툴바 버튼
+        MubloEditor.addToolbarItem('timestamp', {
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+            title: '타임스탬프 삽입 (커스텀 버튼)',
+            onClick: (ed) => {
+                ed.saveSelection();
+                ed.openModal('타임스탬프 삽입', `
+                    <div class="mublo-editor-modal-form-group">
+                        <label class="mublo-editor-modal-label">형식</label>
+                        <select class="mublo-editor-modal-input" id="demo-ts-format">
+                            <option value="datetime">날짜 + 시간</option>
+                            <option value="date">날짜만</option>
+                        </select>
+                    </div>
+                `, '삽입', (modal) => {
+                    const fmt = modal.querySelector('#demo-ts-format').value;
+                    const now = new Date();
+                    const text = fmt === 'date' ? now.toLocaleDateString('ko-KR') : now.toLocaleString('ko-KR');
+                    ed.insertHTML(`<span style="color:#1971c2;">🕐 ${text}</span>&nbsp;`);
+                });
+            }
+        });
 
         // 콘솔에 버전 출력
         console.log('MubloEditor Version:', MubloEditor.VERSION);
