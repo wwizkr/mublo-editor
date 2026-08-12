@@ -25,7 +25,7 @@
   — 서버 엔드포인트 3종. **standalone 직접 실행은 config.local.php 의
   `allow_standalone_handler` 필요** (로컬 개발 전용), 운영은 프레임워크 라우트 사용
 - `editor.lib.php` — PHP 어댑터 / `config.php` — 기본 설정 (프로젝트별 커스터마이징 대상)
-- `demo.html` — 데모/수동 테스트 (php -S 로 실행해야 업로드/OG/변환 동작 — README 참조)
+- `index.html` — 데모/수동 테스트 (php -S 로 실행해야 업로드/OG/변환 동작 — README 참조)
 - `tools/` — build.mjs(빌드) · sync.mjs(배포) · make-mublobot-stickers.mjs(스티커 재생성)
 
 ## 테스트
@@ -34,7 +34,7 @@
 npm test          # node --test + jsdom, 33개 (코어 회귀 + 플러그인 변환기 + v1.7)
 ```
 
-코어/플러그인 수정 시 반드시 통과 확인. UI 인터랙션은 demo.html 수동 확인 병행.
+코어/플러그인 수정 시 반드시 통과 확인. UI 인터랙션은 index.html 수동 확인 병행.
 
 ## 배포 (sync)
 

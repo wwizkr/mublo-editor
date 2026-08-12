@@ -169,14 +169,14 @@ MubloEditor.registerPlugin('stickers', ed => ed.setStickerPacks([
 각 버전 공통 체크리스트:
 
 - [ ] `package.json` version 갱신, README 기능 문서 갱신, `MubloEditor.d.ts` 타입 갱신
-- [ ] `demo.html` 에 신규 기능 데모 추가 (수동 테스트 경로)
+- [ ] `index.html` 에 신규 기능 데모 추가 (수동 테스트 경로)
 - [ ] ko/en 로케일 양쪽 추가
 - [ ] 다크모드 + 320px 모바일 확인
 - [ ] XSS: 신규 삽입 HTML 이 sanitize 경로를 통과하는지 확인
 
 ## 5. 배포 전략
 
-- 개발·검증은 본 저장소(`demo.html`)에서, 배포는 `tools/sync.mjs` 사용
+- 개발·검증은 본 저장소(`index.html`)에서, 배포는 `tools/sync.mjs` 사용
 - 1차 배포: v1.3.0 계열 7개 프로젝트 (public, dev, biseo, mshop, paper, rental, homepage-saas)
 - 2차 배포: v1.2.0 계열 3개 (biz, mshop-crm, rental-saas) — 구버전과의 차이 검증 후 진행
 - `config.php` 는 계속 배포 제외 (프로젝트별 설정)

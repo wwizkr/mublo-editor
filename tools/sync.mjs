@@ -27,7 +27,7 @@ const SYNC_FILES = [
     'MubloEditor.d.ts',
     'README.md',
     'LICENSE',
-    'demo.html',
+    'index.html',
     'editor.lib.php',
     'package.json',
     join('plugins', 'MubloEditorImageUpload.js'),
