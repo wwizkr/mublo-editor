@@ -517,7 +517,12 @@ print("hello from python")
             fd.append('file', file, file.name);
             const res = await fetch('plugins/import/convert.php', { method: 'POST', body: fd });
             const data = await res.json();
-            if (!data.success) throw new Error(data.message || 'convert failed');
+            if (!data.success) {
+                // error 코드를 붙여 던지면 플러그인이 로케일 안내 문구로 표시한다
+                const e = new Error(data.message || 'convert failed');
+                e.code = data.error;
+                throw e;
+            }
             return data.html;
         });
 
