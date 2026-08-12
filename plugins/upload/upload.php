@@ -24,9 +24,16 @@ class MubloEditorUploader {
      *
      * config.php는 필수이며, storage_path와 storage_url을 반드시 포함해야 합니다.
      * config.local.php로 프레임워크별 설정을 오버라이드할 수 있습니다.
+     *
+     * 프레임워크에서 EditorHelper::configure() 등으로 주입한 런타임 설정
+     * ($GLOBALS['_Mublo_editor_config'])이 있으면 가장 우선 적용됩니다.
+     * 이를 통해 도메인별 저장 경로(storage_path/storage_url)가 반영됩니다.
      */
     public static function getConfig(): array
     {
+        // 런타임 오버라이드가 있으면 매 호출마다 병합 (도메인 전환 대응)
+        $runtime = $GLOBALS['_Mublo_editor_config'] ?? [];
+
         if (self::$config === null) {
             $configPath = dirname(__DIR__, 2) . '/config.php';
             $localPath = dirname(__DIR__, 2) . '/config.local.php';
@@ -43,14 +50,6 @@ class MubloEditorUploader {
                 $config = array_merge($config, require $localPath);
             }
 
-            // 필수 설정 검증
-            if (empty($config['storage_path'])) {
-                throw new \RuntimeException('storage_path is required in config.');
-            }
-            if (empty($config['storage_url'])) {
-                throw new \RuntimeException('storage_url is required in config.');
-            }
-
             // 경로가 아닌 설정만 기본값 적용
             $defaults = [
                 'temp_folder' => 'temp',
@@ -64,26 +63,57 @@ class MubloEditorUploader {
             self::$config = array_merge($defaults, $config);
         }
 
-        return self::$config;
+        // 런타임 값이 있으면 병합 (도메인별 storage_path/url, upload_url, csrf_token 등)
+        $merged = $runtime
+            ? array_merge(self::$config, array_intersect_key($runtime, array_flip([
+                'storage_path', 'storage_url', 'temp_folder',
+                'max_file_size', 'allowed_types', 'allowed_extensions',
+                'include_domain', 'temp_expire_hours',
+            ])))
+            : self::$config;
+
+        // 필수 설정 검증 (config.php + 런타임 모두 반영 후)
+        if (empty($merged['storage_path'])) {
+            throw new \RuntimeException('storage_path is required in config.');
+        }
+        if (empty($merged['storage_url'])) {
+            throw new \RuntimeException('storage_url is required in config.');
+        }
+
+        return $merged;
     }
 
     /**
      * HTML 본문을 분석하여 임시 폴더의 이미지를 실제 폴더로 이동하고 경로를 수정합니다.
      *
+     * 이동이 실패하면 해당 이미지의 URL은 재작성하지 않고 원본 유지합니다.
+     * (깨진 이미지를 DB에 저장하는 사일런트 오류 방지)
+     *
      * 사용법:
      *   기본: $cleanHtml = MubloEditorUploader::processHtml($rawHtml, 'board/notice/2026-01-31');
      *   커스텀 경로: $cleanHtml = MubloEditorUploader::processHtml($rawHtml, 'shop/product/FOOD/G-20260210-0001',
      *                    '/path/to/storage/uploads/D1', '/storage/uploads/D1');
+     *   이동 추적: $cleanHtml = MubloEditorUploader::processHtml($rawHtml, 'board/...', null, null, $movedFiles);
      *
      * @param string $html 에디터 원본 HTML
      * @param string $targetFolder 이동할 대상 폴더 (예: 'board/notice/2026-01-31')
      * @param string|null $targetBasePath 커스텀 대상 기본 경로 (null이면 config storage_path 사용)
      * @param string|null $targetBaseUrl 커스텀 대상 기본 URL (null이면 config storage_url 사용)
+     * @param array|null &$moved (out) 이동된 파일 목록 [['source' => ..., 'dest' => ...], ...]
      * @return string 경로가 수정된 HTML
      */
-    public static function processHtml(string $html, string $targetFolder, ?string $targetBasePath = null, ?string $targetBaseUrl = null): string
+    public static function processHtml(string $html, string $targetFolder, ?string $targetBasePath = null, ?string $targetBaseUrl = null, ?array &$moved = null): string
     {
+        if ($moved === null) {
+            $moved = [];
+        }
+
         if (empty($html)) {
+            return $html;
+        }
+
+        $targetFolder = self::sanitizeFolder($targetFolder);
+        if ($targetFolder === '') {
             return $html;
         }
 
@@ -107,13 +137,14 @@ class MubloEditorUploader {
         $tempDir = $storagePath . $ds . $tempFolder . $ds;
         $targetDir = $destBasePath . $ds . str_replace(['/', '\\'], $ds, $targetFolder) . $ds;
 
-        // 대상 디렉토리 생성
-        if (!is_dir($targetDir)) {
-            @mkdir($targetDir, 0755, true);
-        }
-
         // HTML에서 temp 이미지 URL이 있는지 먼저 확인
         if (strpos($html, $storageUrl . '/' . $tempFolder . '/') === false) {
+            return $html;
+        }
+
+        // 대상 디렉토리 생성 (실제 이동 직전에 시도)
+        if (!is_dir($targetDir) && !@mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
+            // 디렉토리 생성 실패 → 이동 자체가 불가능하므로 원본 HTML 반환
             return $html;
         }
 
@@ -121,19 +152,37 @@ class MubloEditorUploader {
         $escapedUrl = preg_quote($storageUrl, '#');
         $escapedTemp = preg_quote($tempFolder, '#');
 
-        // 파일 이동 콜백 (src, srcset, data-src 공용)
-        $moveFile = function(string $fileName) use ($tempDir, $targetDir): void {
+        /**
+         * 파일 이동 콜백 — 성공 시 true, 실패 시 false
+         *
+         * @param array &$moved (out) 성공 시 이동 내역 추가
+         */
+        $moveFile = function(string $fileName) use ($tempDir, $targetDir, &$moved): bool {
             $cleanFileName = preg_replace('/\?.*$/', '', $fileName);
             $sourcePath = $tempDir . $cleanFileName;
             $destPath = $targetDir . $cleanFileName;
 
-            if (file_exists($sourcePath)) {
-                if (!@rename($sourcePath, $destPath)) {
-                    if (@copy($sourcePath, $destPath)) {
-                        @unlink($sourcePath);
-                    }
-                }
+            // 이미 대상 경로에 존재하면 성공으로 간주
+            if (file_exists($destPath)) {
+                return true;
             }
+
+            if (!file_exists($sourcePath)) {
+                return false;
+            }
+
+            if (@rename($sourcePath, $destPath)) {
+                $moved[] = ['source' => $sourcePath, 'dest' => $destPath];
+                return true;
+            }
+
+            if (@copy($sourcePath, $destPath)) {
+                @unlink($sourcePath);
+                $moved[] = ['source' => $sourcePath, 'dest' => $destPath];
+                return true;
+            }
+
+            return false;
         };
 
         // src, data-src 속성에서 임시 폴더 이미지 찾기
@@ -141,10 +190,15 @@ class MubloEditorUploader {
 
         $html = preg_replace_callback($attrPattern, function($matches) use ($moveFile, $targetFolder, $destBaseUrl) {
             $prefix = $matches[1];
+            $tempPrefix = $matches[2];
             $fileName = $matches[3];
             $suffix = $matches[4];
 
-            $moveFile($fileName);
+            if (!$moveFile($fileName)) {
+                // 이동 실패 → 원본 URL 유지
+                return $prefix . $tempPrefix . $fileName . $suffix;
+            }
+
             return $prefix . $destBaseUrl . '/' . $targetFolder . '/' . $fileName . $suffix;
         }, $html) ?? $html;
 
@@ -167,8 +221,10 @@ class MubloEditorUploader {
 
                 if (strpos($url, $tempUrlPrefix) === 0) {
                     $fileName = substr($url, strlen($tempUrlPrefix));
-                    $moveFile($fileName);
-                    $url = $destBaseUrl . '/' . $targetFolder . '/' . $fileName;
+                    if ($moveFile($fileName)) {
+                        $url = $destBaseUrl . '/' . $targetFolder . '/' . $fileName;
+                    }
+                    // 이동 실패 시 원본 URL 유지
                 }
                 $processed[] = trim($url . ' ' . $descriptor);
             }
@@ -176,6 +232,38 @@ class MubloEditorUploader {
         }, $html) ?? $html;
 
         return $result;
+    }
+
+    /**
+     * processHtml에서 이동된 파일을 원래 임시 위치로 되돌림 (DB 저장 실패 시 롤백)
+     *
+     * @param array $moved processHtml의 out-param으로 받은 이동 내역
+     */
+    public static function rollbackMoved(array $moved): void
+    {
+        foreach ($moved as $entry) {
+            $source = $entry['source'] ?? null;
+            $dest = $entry['dest'] ?? null;
+
+            if (!$source || !$dest || !file_exists($dest)) {
+                continue;
+            }
+
+            // 원래 위치로 복원을 시도하되, 실패하면 최소한 이동된 파일은 삭제하여 고아 방지
+            $sourceDir = dirname($source);
+            if (!is_dir($sourceDir)) {
+                @mkdir($sourceDir, 0755, true);
+            }
+
+            if (!@rename($dest, $source)) {
+                if (@copy($dest, $source)) {
+                    @unlink($dest);
+                } else {
+                    // 복원 실패 → 고아 방지를 위해 이동된 파일 삭제
+                    @unlink($dest);
+                }
+            }
+        }
     }
 
     /**
@@ -218,13 +306,13 @@ class MubloEditorUploader {
     {
         $folder = preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $folder);
         $folder = preg_replace('#\.\.+#', '', $folder);
-        $folder = preg_replace('#/{2,}#', '/', $folder);  // collapse consecutive slashes
+        $folder = preg_replace('#/{2,}#', '/', $folder);
         $folder = trim($folder, '/');
         return $folder;
     }
 
     /**
-     * HTTP request handler (for AJAX calls)
+     * HTTP 요청을 처리하는 메인 핸들러 (AJAX 호출용)
      */
     public static function handleRequest(): void
     {
@@ -379,7 +467,30 @@ class MubloEditorUploader {
     }
 }
 
-// 직접 실행된 경우에만 요청 처리 (include 시에는 실행되지 않음)
+// 직접 실행은 기본 차단 (무인증 업로드 방지)
+// 운영 환경에서는 프레임워크 라우트 POST /api/v1/editor/upload 사용을 권장한다.
+// config.local.php 에서 'allow_standalone_handler' => true 설정 시에만 레거시 모드 허용.
+// standalone 모드는 별도 인증/CSRF 보호가 없으므로 공개 운영 환경에서 사용하지 않는다.
 if (basename(__FILE__) == basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
+    try {
+        $cfg = MubloEditorUploader::getConfig();
+    } catch (\Throwable $e) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'CONFIG_ERROR', 'message' => $e->getMessage()]);
+        exit;
+    }
+
+    if (empty($cfg['allow_standalone_handler'])) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'error'   => 'STANDALONE_DISABLED',
+            'message' => 'Standalone upload handler is disabled. Use /api/v1/editor/upload.',
+        ]);
+        exit;
+    }
+
     MubloEditorUploader::handleRequest();
 }
