@@ -1,5 +1,5 @@
 /**
- * 플러그인 테스트 — FileImport 변환기(MD/CSV/TXT) 중심
+ * 플러그인 테스트 — FileImport 변환기(MD/CSV/TXT) + Layouts 프리셋
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +7,9 @@ import { loadMubloEditor, loadPlugin } from './helpers/dom.mjs';
 
 loadMubloEditor();
 loadPlugin('plugins/MubloEditorFileImport.js');
+loadPlugin('plugins/MubloEditorLayouts.js');
 const FI = globalThis.window.MubloEditorFileImport;
+const LY = globalThis.window.MubloEditorLayouts;
 
 test('플러그인 전역 API 노출', () => {
     assert.equal(typeof FI.setConvertHandler, 'function');
@@ -73,4 +75,34 @@ test('textToHtml: 빈 줄로 문단 구분, 단일 개행은 <br>', () => {
 
 test('textToHtml: HTML 특수문자 이스케이프', () => {
     assert.match(FI.textToHtml('<div> & "quote"'), /&lt;div&gt; &amp; &quot;quote&quot;/);
+});
+
+test('Layouts: 프리셋 10종 노출 (2단×2 + 3단 포함)', () => {
+    assert.equal(LY.presets.length, 10);
+    for (const id of ['col-2', 'col-2r', 'col-3']) {
+        assert.ok(LY.presets.includes(id), id + ' 프리셋 존재');
+    }
+});
+
+test('Layouts: col-2 는 이미지|텍스트 2단 (flex-wrap 반응형)', () => {
+    const html = LY.buildLayout('col-2', '/a.jpg', '본문', 40);
+    assert.match(html, /data-mublo-layout="col-2"/);
+    assert.match(html, /flex-wrap:wrap/);
+    assert.ok(html.indexOf('<img') < html.indexOf('본문'), '이미지가 텍스트보다 앞');
+});
+
+test('Layouts: col-2r 은 텍스트|이미지 순서', () => {
+    const html = LY.buildLayout('col-2r', '/a.jpg', '본문', 40);
+    assert.match(html, /data-mublo-layout="col-2r"/);
+    assert.ok(html.indexOf('본문') < html.indexOf('<img'), '텍스트가 이미지보다 앞');
+});
+
+test('Layouts: col-3 는 이미지 최대 3장 + 하단 캡션', () => {
+    const html = LY.buildLayout('col-3', '/a.jpg', '캡션', 40, ['/b.jpg', '/c.jpg']);
+    assert.match(html, /data-mublo-layout="col-3"/);
+    assert.equal((html.match(/<img /g) || []).length, 3);
+    assert.match(html, /캡션/);
+    // 추가 이미지가 없으면 1장만
+    const one = LY.buildLayout('col-3', '/a.jpg', '캡션', 40, []);
+    assert.equal((one.match(/<img /g) || []).length, 1);
 });

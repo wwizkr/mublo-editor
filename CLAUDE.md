@@ -42,6 +42,7 @@ npm test          # node --test + jsdom, 33개 (코어 회귀 + 플러그인 변
 npm run build                     # src/ 수정했다면 먼저 빌드
 npm run sync -- mublo-public      # 특정 프로젝트에 배포
 npm run sync:all                  # 설치된 모든 프로젝트에 배포
+npm run dist                      # 배포용 파일만 dist/ 에 모아서 생성 (git 제외)
 node tools/sync.mjs --all --dry-run
 ```
 
