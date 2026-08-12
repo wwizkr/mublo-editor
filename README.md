@@ -127,6 +127,36 @@ JavaScript 옵션으로는 각각 `toolbarMobile`, `toolbarItemsMobile`,
 열 경계를 드래그하면 열 너비를 조절할 수 있다. 첫 리사이즈 시 `colgroup`이
 생성되고 너비는 % 단위로 저장된다.
 
+## 스마트 붙여넣기 (v1.5)
+
+단일 URL을 붙여넣으면 삽입 방식 선택 팝업이 뜬다.
+
+- **유튜브/Vimeo URL**: 썸네일 카드(유튜브만) / 플레이어 임베드 / 단순 링크
+- **일반 URL**: OG 카드 / 단순 링크 — OG 카드는 메타 수집 핸들러가 있을 때만 표시
+- "이번 세션 동안 이 선택 기억"을 체크하면 같은 종류의 URL은 팝업 없이 삽입
+- 카드 HTML은 인라인 스타일로 완결 (`data-mublo-card` 속성)
+- `data-smart-paste="false"`(또는 `smartPaste: false`)로 기능 자체를 끌 수 있다
+
+OG 메타 수집은 CORS 때문에 서버 프록시가 필요하다. 두 가지 방법:
+
+```html
+<!-- 1. 동봉된 프록시 사용 (PHP, config.local.php 의 allow_standalone_handler 필요) -->
+<textarea class="mublo-editor" data-og-proxy="plugins/opengraph/og-proxy.php"></textarea>
+```
+
+```javascript
+// 2. 커스텀 핸들러 주입 (프레임워크 라우트 등)
+editor.setOgFetchHandler(async (url) => {
+    const res = await fetch('/api/v1/editor/og?url=' + encodeURIComponent(url));
+    return res.json();  // {title, description, image, host}
+});
+```
+
+동봉 프록시(`plugins/opengraph/og-proxy.php`)는 SSRF 방어(사설/루프백 IP 차단,
+80/443 포트 제한, 리다이렉트 재검증, 3초 타임아웃, 512KB 상한)와 24시간 파일
+캐시를 포함한다. 운영 환경에서는 프레임워크 라우트에서
+`MubloEditorOgProxy::fetch($url)`를 호출하는 방식을 권장한다.
+
 ## 플러그인 확장 API (v1.4)
 
 플러그인이 툴바 버튼·모달·콘텐츠 삽입을 사용할 수 있다.

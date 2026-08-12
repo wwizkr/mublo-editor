@@ -78,6 +78,17 @@ interface MubloEditorStatic {
     syncAll(): void;
 }
 
+/** OG 메타 수집 결과 (v1.5) */
+interface OgMeta {
+    title?: string;
+    description?: string;
+    image?: string;
+    host?: string;
+}
+
+/** OG 메타 수집 핸들러 (v1.5) */
+type OgFetchHandler = (url: string) => Promise<OgMeta>;
+
 /** 플러그인이 등록하는 커스텀 툴바 버튼 정의 (v1.4) */
 interface CustomToolbarButton {
     /** 버튼 아이콘 (인라인 SVG 또는 HTML) */
@@ -204,6 +215,15 @@ interface Editor {
 
     /** 저장된 선택 영역 복원 (v1.4) */
     restoreSelection(): this;
+
+    /**
+     * OG 메타 수집 핸들러 설정 (v1.5 스마트 붙여넣기).
+     * 설정하면 일반 URL 붙여넣기에 "OG 카드" 옵션이 나타난다.
+     */
+    setOgFetchHandler(handler: OgFetchHandler): this;
+
+    /** OG 메타 수집 핸들러 반환 (v1.5) */
+    getOgFetchHandler(): OgFetchHandler | null;
 
     /**
      * 이벤트 리스너 등록

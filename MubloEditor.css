@@ -1021,3 +1021,49 @@ body.mublo-editor-noscroll {
 .mublo-editor-content.mublo-editor-col-resizing,
 .mublo-editor-content.mublo-editor-col-resizing * { cursor: col-resize !important; }
 .mublo-editor-col-resize-hover { cursor: col-resize; }
+
+/* =========================================================
+ * 스마트 붙여넣기 선택 팝업 (v1.5)
+ * ========================================================= */
+.mublo-editor-paste-url {
+    margin-bottom: .875rem;
+    padding: .5rem .75rem;
+    border-radius: .375rem;
+    background: var(--muted, var(--bs-tertiary-bg, #f8f9fa));
+    color: var(--muted-foreground, var(--bs-secondary-color, #6c757d));
+    font-size: .8125rem;
+    word-break: break-all;
+}
+.mublo-editor-paste-opts {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    margin-bottom: .875rem;
+}
+.mublo-editor-paste-opt {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .7rem .9rem;
+    border: 1px solid var(--border, var(--bs-border-color, #dee2e6));
+    border-radius: .5rem;
+    background: var(--background, var(--bs-body-bg, #fff));
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .12s ease, background .12s ease;
+}
+.mublo-editor-paste-opt:hover { border-color: var(--bs-primary, #0d6efd); }
+.mublo-editor-paste-opt.selected {
+    border-color: var(--bs-primary, #0d6efd);
+    background: rgba(13, 110, 253, .06);
+}
+.mublo-editor-paste-opt-icon { font-size: 1.25rem; flex: 0 0 auto; }
+.mublo-editor-paste-opt-text { display: flex; flex-direction: column; gap: .125rem; min-width: 0; }
+.mublo-editor-paste-opt-text strong {
+    font-size: .875rem;
+    color: var(--foreground, var(--bs-body-color, #212529));
+}
+.mublo-editor-paste-opt-text small {
+    font-size: .75rem;
+    color: var(--muted-foreground, var(--bs-secondary-color, #6c757d));
+}

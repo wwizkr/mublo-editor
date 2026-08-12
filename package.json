@@ -1,6 +1,6 @@
 {
   "name": "mublo-editor",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "경량 WYSIWYG 에디터 - 순수 JavaScript로 구현된 웹 에디터",
   "main": "MubloEditor.js",
   "types": "MubloEditor.d.ts",

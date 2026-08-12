@@ -104,7 +104,7 @@
 const MubloEditor = (() => {
     'use strict';
 
-    const VERSION = '1.4.0';
+    const VERSION = '1.5.0';
     const EDITOR_CLASS = 'mublo-editor';
     const EDITOR_WRAPPER_CLASS = 'mublo-editor-wrapper';
     const EDITOR_TOOLBAR_CLASS = 'mublo-editor-toolbar';
@@ -200,6 +200,14 @@ const MubloEditor = (() => {
             tableCellBg: '셀 배경색', tableBgClear: '지우기', tableRecentColors: '최근 사용',
             tableStyleHint: '간격/테두리는 테이블 전체, 배경색은 선택한 셀에 적용됩니다.',
             apply: '적용',
+            // 스마트 붙여넣기 (v1.5)
+            pasteVideoTitle: '동영상 링크 붙여넣기', pasteLinkTitle: '링크 붙여넣기',
+            pasteThumbCard: '썸네일 카드', pasteThumbCardDesc: '이미지 카드로 삽입, 클릭 시 이동',
+            pasteEmbed: '플레이어 임베드', pasteEmbedDesc: '에디터에 동영상 플레이어 직접 삽입',
+            pastePlainLink: '단순 링크', pastePlainLinkDesc: 'URL 텍스트 링크로 삽입',
+            pasteOgCard: 'OG 카드로 삽입', pasteOgCardDesc: '링크 미리보기 카드로 삽입',
+            pasteRemember: '이번 세션 동안 이 선택 기억',
+            pasteFetching: '링크 정보를 가져오는 중...',
         },
         en: {
             bold: 'Bold (Ctrl+B)', italic: 'Italic (Ctrl+I)', underline: 'Underline (Ctrl+U)',
@@ -274,6 +282,14 @@ const MubloEditor = (() => {
             tableCellBg: 'Cell Background', tableBgClear: 'Clear', tableRecentColors: 'Recent',
             tableStyleHint: 'Spacing/border apply to the whole table, background to selected cells.',
             apply: 'Apply',
+            // Smart paste (v1.5)
+            pasteVideoTitle: 'Paste Video Link', pasteLinkTitle: 'Paste Link',
+            pasteThumbCard: 'Thumbnail card', pasteThumbCardDesc: 'Insert as image card, opens on click',
+            pasteEmbed: 'Player embed', pasteEmbedDesc: 'Insert playable video player',
+            pastePlainLink: 'Plain link', pastePlainLinkDesc: 'Insert as text link',
+            pasteOgCard: 'OG card', pasteOgCardDesc: 'Insert as link preview card',
+            pasteRemember: 'Remember for this session',
+            pasteFetching: 'Fetching link info...',
         }
     };
 
@@ -863,6 +879,21 @@ const MubloEditor = (() => {
             // 테이블 스타일 다이얼로그 최근 사용 색상
             this._recentTableColors = [];
 
+            // 스마트 붙여넣기 (v1.5)
+            this._ogFetchHandler = null;
+            this._smartPasteChoice = { video: null, link: null }; // 세션 기억
+            if (this.options.ogProxyUrl) {
+                // 기본 핸들러: og 프록시 엔드포인트 (JSON {title, description, image, host})
+                const proxy = this.options.ogProxyUrl;
+                this._ogFetchHandler = async (url) => {
+                    const res = await fetch(proxy + (proxy.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(url));
+                    if (!res.ok) throw new Error('og fetch failed: ' + res.status);
+                    const data = await res.json();
+                    if (data.success === false) throw new Error(data.message || 'og fetch failed');
+                    return data;
+                };
+            }
+
             this._withLocale(() => this._build());
             this._withLocale(() => this._bindEvents());
             this._initPlugins();
@@ -892,6 +923,8 @@ const MubloEditor = (() => {
             if (el.dataset.autosaveInterval) dataOptions.autosaveInterval = parseInt(el.dataset.autosaveInterval, 10);
             if (el.dataset.autosaveKey) dataOptions.autosaveKey = el.dataset.autosaveKey;
             if (el.dataset.locale) dataOptions.locale = el.dataset.locale;
+            if (el.dataset.ogProxy) dataOptions.ogProxyUrl = el.dataset.ogProxy;
+            if (el.dataset.smartPaste !== undefined) dataOptions.smartPaste = el.dataset.smartPaste === 'true';
 
             return {
                 toolbar: 'full',
@@ -910,6 +943,10 @@ const MubloEditor = (() => {
                 sanitize: true,
                 automatic_uploads: true,
                 images_upload_credentials: false,
+                // 스마트 붙여넣기: OG 메타 수집 프록시 URL (null 이면 OG 카드 옵션 숨김)
+                ogProxyUrl: null,
+                // URL 붙여넣기 선택 팝업 사용 여부
+                smartPaste: true,
                 // 콜백 (하위 호환성)
                 onChange: null,
                 onFocus: null,
@@ -1041,6 +1078,24 @@ const MubloEditor = (() => {
         /** 선택 영역 저장/복원 — 모달을 띄우기 전/후에 사용 */
         saveSelection() { this._saveSelection(); return this; }
         restoreSelection() { this._restoreSelection(); return this; }
+
+        /**
+         * OG 메타 수집 핸들러 설정 (v1.5 스마트 붙여넣기).
+         * handler: (url) => Promise<{title, description, image, host}>
+         * 설정 시 일반 URL 붙여넣기에 "OG 카드" 옵션이 나타난다.
+         */
+        setOgFetchHandler(handler) {
+            if (typeof handler !== 'function') {
+                console.error('[MubloEditor] OG fetch handler must be a function');
+                return this;
+            }
+            this._ogFetchHandler = handler;
+            return this;
+        }
+
+        getOgFetchHandler() {
+            return this._ogFetchHandler;
+        }
 
         // =========================================================
         // 빌드
@@ -2324,6 +2379,176 @@ const MubloEditor = (() => {
             }
 
             return null;
+        }
+
+        // =========================================================
+        // 스마트 붙여넣기 (v1.5)
+        // 단일 URL 붙여넣기 → 삽입 방식 선택 (썸네일 카드 / 임베드 / OG 카드 / 단순 링크)
+        // =========================================================
+
+        /** YouTube 영상 ID 추출 (썸네일 카드용). 아니면 null */
+        _getYouTubeId(url) {
+            const embed = this._parseVideoUrl(url);
+            const m = embed && embed.match(/youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+            return m ? m[1] : null;
+        }
+
+        /** 붙여넣은 내용이 단일 URL 이면 선택 팝업 처리. 처리했으면 true */
+        _trySmartPaste(e) {
+            const text = (e.clipboardData?.getData('text/plain') || '').trim();
+            if (!/^https?:\/\/\S+$/.test(text)) return false;
+            if (this._getClosestCodeBlock()) return false; // 코드 블록 안은 그대로 붙여넣기
+
+            const videoEmbed = this._parseVideoUrl(text);
+            const hasOg = typeof this._ogFetchHandler === 'function';
+
+            // 일반 URL 인데 OG 핸들러가 없으면 선택지가 하나뿐 → 기본 동작 유지
+            if (!videoEmbed && !hasOg) return false;
+
+            e.preventDefault();
+            this._saveSelection();
+
+            // 세션 기억 선택이 있으면 즉시 적용
+            const kind = videoEmbed ? 'video' : 'link';
+            const remembered = this._smartPasteChoice[kind];
+            if (remembered) {
+                this._applySmartPaste(remembered, text, videoEmbed);
+                return true;
+            }
+
+            this._withLocale(() => this._openSmartPasteDialog(text, videoEmbed, hasOg));
+            return true;
+        }
+
+        _openSmartPasteDialog(url, videoEmbed, hasOg) {
+            const ytId = videoEmbed ? this._getYouTubeId(url) : null;
+            const options = [];
+            if (videoEmbed) {
+                // 썸네일 카드는 서버 없이 썸네일을 얻을 수 있는 YouTube 만 제공
+                if (ytId) options.push({ id: 'card', icon: '🖼️', label: _t('pasteThumbCard'), desc: _t('pasteThumbCardDesc') });
+                options.push({ id: 'embed', icon: '▶️', label: _t('pasteEmbed'), desc: _t('pasteEmbedDesc') });
+            } else if (hasOg) {
+                options.push({ id: 'og', icon: '🪧', label: _t('pasteOgCard'), desc: _t('pasteOgCardDesc') });
+            }
+            options.push({ id: 'link', icon: '🔗', label: _t('pastePlainLink'), desc: _t('pastePlainLinkDesc') });
+
+            const optionsHtml = options.map((o, i) => `
+                <button type="button" class="mublo-editor-paste-opt${i === 0 ? ' selected' : ''}" data-choice="${o.id}">
+                    <span class="mublo-editor-paste-opt-icon">${o.icon}</span>
+                    <span class="mublo-editor-paste-opt-text">
+                        <strong>${o.label}</strong>
+                        <small>${o.desc}</small>
+                    </span>
+                </button>`).join('');
+
+            const body = `
+                <div class="mublo-editor-paste-url">${escapeHtml(url)}</div>
+                <div class="mublo-editor-paste-opts">${optionsHtml}</div>
+                <div class="mublo-editor-modal-check">
+                    <input type="checkbox" id="mublo-editor-paste-remember">
+                    <label for="mublo-editor-paste-remember">${_t('pasteRemember')}</label>
+                </div>
+            `;
+
+            const modal = this._createModal(
+                videoEmbed ? _t('pasteVideoTitle') : _t('pasteLinkTitle'),
+                body, _t('insert'),
+                (m) => {
+                    const choice = m.querySelector('.mublo-editor-paste-opt.selected')?.dataset.choice || 'link';
+                    if (m.querySelector('#mublo-editor-paste-remember').checked) {
+                        this._smartPasteChoice[videoEmbed ? 'video' : 'link'] = choice;
+                    }
+                    this._withLocale(() => this._applySmartPaste(choice, url, videoEmbed));
+                }
+            );
+
+            modal.querySelectorAll('.mublo-editor-paste-opt').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modal.querySelectorAll('.mublo-editor-paste-opt').forEach(b => b.classList.toggle('selected', b === btn));
+                });
+                btn.addEventListener('dblclick', () => {
+                    modal.querySelector('#mublo-editor-modal-confirm').click();
+                });
+            });
+        }
+
+        _applySmartPaste(choice, url, videoEmbed) {
+            switch (choice) {
+                case 'card': this._insertVideoThumbCard(url); break;
+                case 'embed': this.insertVideo(url); break;
+                case 'og': this._insertOgCard(url); break;
+                default: this._insertPlainLink(url);
+            }
+        }
+
+        _insertPlainLink(url) {
+            this._restoreSelection();
+            const safe = escapeHtml(url);
+            this._exec('insertHTML', `<a href="${safe}" target="_blank" rel="noopener noreferrer">${safe}</a>`);
+        }
+
+        /** YouTube 썸네일 카드 삽입. OG 핸들러가 있으면 제목도 가져온다 */
+        async _insertVideoThumbCard(url) {
+            const ytId = this._getYouTubeId(url);
+            if (!ytId) { this._insertPlainLink(url); return; }
+            const thumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+
+            let title = '';
+            if (typeof this._ogFetchHandler === 'function') {
+                try {
+                    const og = await this._ogFetchHandler(url);
+                    title = og?.title || '';
+                } catch (err) { /* 제목 없이 진행 */ }
+            }
+
+            const safeUrl = escapeHtml(url);
+            const label = escapeHtml(title || url);
+            const html =
+                `<figure data-mublo-card="video" contenteditable="false" style="margin:1em 0;">` +
+                `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="display:block;max-width:480px;border:1px solid #dee2e6;border-radius:8px;overflow:hidden;text-decoration:none;background:#fff;">` +
+                `<span style="position:relative;display:block;"><img src="${thumb}" alt="${label}" loading="lazy" style="display:block;width:100%;height:auto;">` +
+                `<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:20px;line-height:48px;text-align:center;">▶</span></span>` +
+                `<span style="display:block;padding:.55em .8em;color:#495057;font-size:.875em;word-break:break-all;">${label}</span>` +
+                `</a></figure><p><br></p>`;
+            this._restoreSelection();
+            this._exec('insertHTML', html);
+        }
+
+        /** OG 카드 삽입. 메타 수집 실패 시 단순 링크로 폴백 */
+        async _insertOgCard(url) {
+            let og = null;
+            try {
+                og = await this._ogFetchHandler(url);
+            } catch (err) {
+                console.warn('[MubloEditor] OG fetch failed, fallback to plain link:', err);
+            }
+            if (!og || (!og.title && !og.description && !og.image)) {
+                this._insertPlainLink(url);
+                return;
+            }
+
+            const safeUrl = escapeHtml(url);
+            let host = '';
+            try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (err) { /* 무시 */ }
+            const title = escapeHtml(og.title || host || url);
+            const desc = escapeHtml((og.description || '').slice(0, 160));
+            // 이미지는 http(s) URL 만 허용
+            const image = (typeof og.image === 'string' && /^https?:\/\//i.test(og.image)) ? escapeHtml(og.image) : '';
+
+            const imgHtml = image
+                ? `<span style="flex:0 0 96px;align-self:stretch;overflow:hidden;"><img src="${image}" alt="" loading="lazy" style="display:block;width:96px;height:100%;min-height:72px;object-fit:cover;"></span>`
+                : '';
+            const html =
+                `<figure data-mublo-card="og" contenteditable="false" style="margin:1em 0;">` +
+                `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="display:flex;max-width:560px;border:1px solid #dee2e6;border-radius:8px;overflow:hidden;text-decoration:none;background:#fff;">` +
+                imgHtml +
+                `<span style="display:block;flex:1;min-width:0;padding:.7em .9em;">` +
+                `<span style="display:block;color:#212529;font-weight:600;font-size:.9em;line-height:1.35;overflow:hidden;">${title}</span>` +
+                (desc ? `<span style="display:block;margin-top:.25em;color:#6c757d;font-size:.8em;line-height:1.4;overflow:hidden;">${desc}</span>` : '') +
+                `<span style="display:block;margin-top:.35em;color:#adb5bd;font-size:.75em;">${escapeHtml(host)}</span>` +
+                `</span></a></figure><p><br></p>`;
+            this._restoreSelection();
+            this._exec('insertHTML', html);
         }
 
         _insertTable() {
@@ -4351,6 +4576,8 @@ const MubloEditor = (() => {
                     }
                 }
             }
+            // 스마트 붙여넣기: 클립보드가 단일 URL 이면 삽입 방식 선택 (v1.5)
+            if (this.options.smartPaste && this._trySmartPaste(e)) return;
             if (this.options.sanitize) {
                 const html = e.clipboardData?.getData('text/html');
                 if (html) {
