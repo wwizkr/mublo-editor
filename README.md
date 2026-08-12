@@ -194,6 +194,19 @@ MubloEditorStickers.setPacks([
 ]);
 ```
 
+기본 팩 2종이 동봉되어 있다. `plugins/stickers/packs.js` 를 로드하면 등록된다.
+
+- **머블로봇** (`plugins/stickers/mublobot/`, 10종) — 자체 제작 SVG 마스코트.
+  `tools/make-mublobot-stickers.mjs` 로 재생성할 수 있고, 고품질 이미지로 교체하려면
+  같은 파일명으로 덮어쓰면 된다.
+- **Twemoji** (`plugins/stickers/twemoji/`, 24종) — CC-BY 4.0.
+  공개 사이트에서 사용 시 출처 고지 필요 (`twemoji/LICENSE.txt` 참조).
+
+```html
+<script src="plugins/MubloEditorStickers.js"></script>
+<script src="plugins/stickers/packs.js"></script>
+```
+
 ## 플러그인 확장 API (v1.4)
 
 플러그인이 툴바 버튼·모달·콘텐츠 삽입을 사용할 수 있다.

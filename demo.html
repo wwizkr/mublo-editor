@@ -273,6 +273,7 @@ print("hello from python")
     <script src="plugins/MubloEditorFileImport.js"></script>
     <script src="plugins/MubloEditorExport.js"></script>
     <script src="plugins/MubloEditorStickers.js"></script>
+    <script src="plugins/stickers/packs.js"></script>
 
     <script>
         // 2. 자동 저장 에디터 (JavaScript로 생성)
@@ -502,24 +503,7 @@ print("hello from python")
             }
         });
 
-        // 0-3. 스티커 데모 팩 (인라인 SVG 데이터 URI — 실제로는 프로젝트 에셋 경로 사용)
-        function demoSticker(emoji, bg) {
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><circle cx="48" cy="48" r="44" fill="${bg}"/><text x="48" y="60" font-size="40" text-anchor="middle">${emoji}</text></svg>`;
-            return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-        }
-        MubloEditorStickers.setPacks([
-            {
-                name: '데모봇',
-                items: [
-                    { src: demoSticker('😀', '#ffe066'), label: '기분 최고!' },
-                    { src: demoSticker('👍', '#a5d8ff'), label: '좋아요' },
-                    { src: demoSticker('🎉', '#ffc9c9'), label: '축하해요' },
-                    { src: demoSticker('🔥', '#ffd8a8'), label: '불타오르네' },
-                    { src: demoSticker('😴', '#d0bfff'), label: '졸려요' },
-                    { src: demoSticker('💪', '#b2f2bb'), label: '파이팅' }
-                ]
-            }
-        ]);
+        // 0-3. 스티커 팩은 plugins/stickers/packs.js 에서 등록됨 (머블로봇 + Twemoji)
 
         // 데모 제목에 버전 표시
         document.getElementById('demo-version').textContent = 'v' + MubloEditor.VERSION;
