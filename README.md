@@ -2,6 +2,31 @@
 
 외부 의존성 없이 동작하는 Mublo 전용 WYSIWYG 에디터다.
 
+## 데모 실행 (로컬 개발)
+
+이미지 업로드는 PHP(`plugins/upload/upload.php`)가 실행되어야 하므로
+정적 서버나 `file://`로 열면 업로드가 404로 실패한다. PHP 내장 서버를 사용한다.
+
+```bash
+php -S 127.0.0.1:8641
+# → http://127.0.0.1:8641/demo.html
+```
+
+업로드 핸들러는 보안상(무인증) 기본 차단이다. 로컬 데모에서만
+`config.local.php`(git 추적 제외)를 만들어 허용한다.
+
+```php
+<?php
+return [
+    'storage_path' => __DIR__ . '/storage',
+    'storage_url'  => '/storage',
+    'allow_standalone_handler' => true, // 로컬 개발 전용
+];
+```
+
+운영 환경에서는 standalone 핸들러 대신 프레임워크 라우트
+`POST /api/v1/editor/upload`를 사용한다.
+
 ## 기본 사용법
 
 CSS와 JavaScript를 로드한 뒤 `mublo-editor` 클래스를 붙이면 자동으로 초기화된다.
