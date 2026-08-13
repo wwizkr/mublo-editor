@@ -242,13 +242,21 @@ class MubloEditorFileConverter
     // ---------------------------------------------------------
     // PDF — pdftotext 가 설치된 환경에서만
     // ---------------------------------------------------------
+
+    /** config 의 'pdftotext_bin' 으로 명시 지정 가능 (PATH 미탐색 환경 대비) */
+    public static ?string $pdftotextBin = null;
+
     private static function convertPdf(string $path): array
     {
         // "명령을 찾을 수 없음" 에러 문구에도 명령 이름이 포함되므로,
         // 버전 출력 형식("pdftotext version x.y")까지 확인해야 오탐이 없다 (특히 Windows).
         $bin = null;
-        foreach (['pdftotext', '/usr/bin/pdftotext', '/usr/local/bin/pdftotext'] as $cand) {
-            $check = @shell_exec(escapeshellcmd($cand) . ' -v 2>&1');
+        $candidates = array_filter(array_merge(
+            [self::$pdftotextBin],
+            ['pdftotext', '/usr/bin/pdftotext', '/usr/local/bin/pdftotext']
+        ));
+        foreach ($candidates as $cand) {
+            $check = @shell_exec(escapeshellarg($cand) . ' -v 2>&1');
             if ($check !== null && preg_match('/pdftotext\s+version\s+[\d.]/i', (string)$check)) { $bin = $cand; break; }
         }
         if ($bin === null) {
@@ -260,7 +268,7 @@ class MubloEditorFileConverter
             ];
         }
         $nullDev = DIRECTORY_SEPARATOR === '\\' ? 'nul' : '/dev/null';
-        $out = @shell_exec(escapeshellcmd($bin) . ' -layout -enc UTF-8 ' . escapeshellarg($path) . ' - 2>' . $nullDev);
+        $out = @shell_exec(escapeshellarg($bin) . ' -layout -enc UTF-8 ' . escapeshellarg($path) . ' - 2>' . $nullDev);
         if (!$out || trim($out) === '') {
             return ['success' => false, 'error' => 'EMPTY', 'message' => 'No extractable text (scanned/image-only PDF?)'];
         }
@@ -312,5 +320,7 @@ if (basename(__FILE__) == basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
         ]);
         exit;
     }
+    // PATH 에서 pdftotext 를 못 찾는 환경은 config 로 절대 경로 지정 가능
+    MubloEditorFileConverter::$pdftotextBin = $config['pdftotext_bin'] ?? null;
     MubloEditorFileConverter::handleRequest();
 }
