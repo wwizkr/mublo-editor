@@ -55,6 +55,57 @@ test('mdToHtml: XSS 원문은 이스케이프된다', () => {
     assert.match(html, /&lt;script&gt;/);
 });
 
+test('mdToHtml: <details>/<summary> 생 HTML 블록은 태그로 살아남는다', () => {
+    const html = FI.mdToHtml('<details>\n<summary>더 보기</summary>\n<ul><li>항목</li></ul>\n</details>');
+    assert.match(html, /<details>/);
+    assert.match(html, /<summary>더 보기<\/summary>/);
+    assert.doesNotMatch(html, /&lt;details&gt;/);
+});
+
+test('mdToHtml: 생 HTML 블록 안의 <a href>·<li> 는 이스케이프되지 않는다', () => {
+    const html = FI.mdToHtml('<details>\n<ul><li>Built using <a href="https://rubyonrails.org/">Ruby on Rails</a></li></ul>\n</details>');
+    assert.match(html, /<a href="https:\/\/rubyonrails\.org\/">Ruby on Rails<\/a>/);
+    assert.match(html, /<li>Built using/);
+    assert.doesNotMatch(html, /&lt;a href/);
+});
+
+test('mdToHtml: <script> 블록은 여전히 이스케이프된다 (허용 목록 밖)', () => {
+    const html = FI.mdToHtml('<script>\nalert(1)\n</script>');
+    assert.doesNotMatch(html, /<script>/);
+    assert.match(html, /&lt;script&gt;/);
+});
+
+test('mdToHtml: <iframe>·<style> 블록도 이스케이프된다', () => {
+    const a = FI.mdToHtml('<iframe src="https://evil.example"></iframe>');
+    assert.doesNotMatch(a, /<iframe/);
+    assert.match(a, /&lt;iframe/);
+    const b = FI.mdToHtml('<style>\nbody{display:none}\n</style>');
+    assert.doesNotMatch(b, /<style/);
+    assert.match(b, /&lt;style&gt;/);
+});
+
+test('mdToHtml: 마크다운과 생 HTML 이 섞여도 마크다운 변환은 그대로다', () => {
+    const html = FI.mdToHtml('# 제목\n\n<details>\n<summary>펼치기</summary>\n</details>\n\n- 목록\n\n[링크](https://a.com)');
+    assert.match(html, /<h1>제목<\/h1>/);
+    assert.match(html, /<details>/);
+    assert.match(html, /<ul><li>목록<\/li><\/ul>/);
+    assert.match(html, /<a href="https:\/\/a\.com"[^>]*>링크<\/a>/);
+});
+
+test('mdToHtml: HTML 주석은 본문에 글자로 남지 않는다', () => {
+    const html = FI.mdToHtml('<!-- Made with love -->\n\n본문');
+    assert.match(html, /<!-- Made with love -->/);
+    assert.doesNotMatch(html, /&lt;!--/);
+    assert.match(html, /<p>본문<\/p>/);
+});
+
+test('mdToHtml: 코드 펜스 안의 <b>·허용 태그는 계속 이스케이프된다', () => {
+    const html = FI.mdToHtml('```\n<details>\n<b>bold</b>\n```');
+    assert.match(html, /&lt;details&gt;/);
+    assert.match(html, /&lt;b&gt;/);
+    assert.doesNotMatch(html, /<details>/);
+});
+
 test('csvToHtml: 쉼표/인용부호/개행 처리', () => {
     const html = FI.csvToHtml('이름,메모\n"김, 철수","줄1\n줄2"\n영희,보통');
     assert.match(html, /<th[^>]*>이름<\/th>/);
