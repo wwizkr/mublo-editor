@@ -5,6 +5,8 @@
  * ============================================================
  *
  * 클라이언트 단독 지원: TXT · MD · HTML · CSV
+ *   MD 안의 블록 수준 생 HTML(<details> 등)은 구조 태그 허용 목록에 한해
+ *   그대로 통과한다 — script/iframe 등 실행 계열은 이스케이프 (mdToHtml 참조).
  * 서버 변환 지원(선택): DOCX · XLSX · PDF
  *   MubloEditorFileImport.setConvertHandler(async (file) => html)
  *   핸들러를 등록하면 해당 확장자가 자동 활성화된다.
@@ -60,7 +62,21 @@
         ).join('');
     }
 
-    /** 경량 마크다운 파서 (heading/list/code/quote/table/hr/인라인 서식) */
+    // 마크다운 안의 블록 수준 생 HTML 을 그대로 통과시킬 구조 태그 허용 목록.
+    // CommonMark 는 <script>·<style> 같은 type 1 블록도 통과시키지만, 여기서는
+    // 규격에서 의도적으로 벗어나 구조 태그만 허용한다 — 삽입 시 sanitize 가
+    // 최종 방어선이긴 해도, 파서가 실행 계열 태그를 흘려보내며 그쪽에만 기댈
+    // 이유가 없기 때문(허용 목록이 1차 방어). 목록 밖 태그(script/style/iframe/
+    // form/svg 등)는 기존대로 이스케이프 경로를 탄다.
+    const MD_RAW_TAGS = new Set([
+        'div', 'p', 'details', 'summary', 'section', 'article', 'aside',
+        'header', 'footer', 'nav', 'main', 'figure', 'figcaption', 'blockquote',
+        'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+        'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+        'hr', 'br', 'img', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+    ]);
+
+    /** 경량 마크다운 파서 (heading/list/code/quote/table/hr/생 HTML 블록/인라인 서식) */
     function mdToHtml(md) {
         const lines = md.replace(/\r\n/g, '\n').split('\n');
         const out = [];
@@ -90,6 +106,30 @@
             }
             const codeStart = line.match(/^```(\w*)/);
             if (codeStart) { flushPara(); flushList(); inCode = true; codeLang = codeStart[1]; continue; }
+
+            // 생 HTML 블록: 허용 목록의 태그로 시작하는 줄(선행 공백 3칸까지)은
+            // 빈 줄까지 원문 그대로 통과 — esc()/inline() 을 적용하면 <details>
+            // 같은 블록이 글자로 깨진다. .html 가져오기가 생 HTML 을 그대로
+            // 통과시키므로(둘 다 사용자가 고른 파일 + 삽입 시 sanitize) 확장자에
+            // 따라 동작이 갈리지 않게 맞춘다. 종료 조건(빈 줄)은 CommonMark
+            // type 6/7 과 같다.
+            const rawTag = line.match(/^ {0,3}<\/?([a-zA-Z][a-zA-Z0-9-]*)(?=[\s/>]|$)/);
+            if (rawTag && MD_RAW_TAGS.has(rawTag[1].toLowerCase())) {
+                flushPara(); flushList();
+                const buf = [];
+                while (i < lines.length && lines[i].trim() !== '') { buf.push(lines[i]); i++; }
+                i--;
+                out.push(buf.join('\n'));
+                continue;
+            }
+            // HTML 주석도 --> 까지 블록으로 모아 통과 (이스케이프하면 본문에 글자로 남는다)
+            if (/^ {0,3}<!--/.test(line)) {
+                flushPara(); flushList();
+                const buf = [];
+                while (i < lines.length) { buf.push(lines[i]); if (lines[i].includes('-->')) break; i++; }
+                out.push(buf.join('\n'));
+                continue;
+            }
 
             const h = line.match(/^(#{1,6})\s+(.*)/);
             if (h) { flushPara(); flushList(); out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); continue; }

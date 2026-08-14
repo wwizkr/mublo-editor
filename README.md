@@ -178,7 +178,7 @@ editor.setOgFetchHandler(async (url) => {
 | 플러그인 | 버튼 이름 | 기능 |
 |---|---|---|
 | `MubloEditorLayouts.js` | `layout` | 이미지+텍스트 레이아웃 10종 (좌/우/상/하/2단×2/캡션×2/3단 이미지/오버레이) |
-| `MubloEditorFileImport.js` | `fileimport` | TXT·MD·HTML·CSV 가져오기 + 삽입 방식 3택 |
+| `MubloEditorFileImport.js` | `fileimport` | TXT·MD·HTML·CSV 가져오기 + 삽입 방식 3택 (MD 는 블록 수준 생 HTML 을 구조 태그 허용 목록에 한해 통과) |
 | `MubloEditorExport.js` | `export` | Word(.doc) 항상 / PDF(html2pdf.js 로드 시) |
 | `MubloEditorStickers.js` | `sticker` | 스티커 팩 뷰어 + 최근 사용(localStorage) |
 
